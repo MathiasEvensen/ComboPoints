@@ -3,6 +3,7 @@
 ## Notes: Customisable tracker for Combo Points and other point-based resources.
 ## Author: iMatMan
 ## Version: 1.0.3
+## X-Curse-Project-ID: 1643324
 ## SavedVariables: ComboPointsDB
 ## IconTexture: Interface\AddOns\ComboPoints\icon.tga
 ## Category: Unit Frames
