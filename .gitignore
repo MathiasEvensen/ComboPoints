@@ -39,3 +39,6 @@ luac.out
 *.x86_64
 *.hex
 
+# Internal notes, not for release
+NOTES.md
+
