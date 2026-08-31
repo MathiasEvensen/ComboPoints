@@ -22,8 +22,3 @@ Grab a release zip from [CurseForge](https://www.curseforge.com/wow/addons/combo
 
 Settings are stored per character. Layout, colors, style, and frame attachment are all configurable through the in-game editor, with a live preview.
 
-## Development
-
-`Interface/AddOns/ComboPoints` is a symlink to this repo's `ComboPoints/` directory. Edit files here, then `/reload` in WoW (or restart the client) to pick up Lua/TOC changes.
-
-Releases are packaged and pushed to CurseForge automatically via GitHub Actions whenever a `v*` tag is pushed.
