@@ -10,7 +10,7 @@ A World of Warcraft addon that shows a customizable point tracker for:
 
 ## Install
 
-Grab a release zip from [CurseForge](https://www.curseforge.com/wow/addons/combo-points) or the [Releases](../../releases) page and drop the `ComboPoints` folder into `Interface/AddOns`.
+Grab a release zip from [CurseForge](https://www.curseforge.com/wow/addons/combo-points) or the [Releases](../../releases) page. The zip contains a `ComboPoints` folder — drop it into `Interface/AddOns`.
 
 ## Use
 

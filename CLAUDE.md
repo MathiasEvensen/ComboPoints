@@ -21,14 +21,17 @@ Settings are stored per character. In the **Profiles** tab, select a saved chara
 
 ## Development install
 
-`Interface/AddOns/ComboPoints` is a symlink to this project's `ComboPoints/` directory. Edit files here, then use `/reload` in WoW (or restart client) for Lua/TOC changes. WoW does not hot-reload changed Lua files while running; live panel settings do apply immediately.
+`Interface/AddOns/ComboPoints` is a symlink to this repository's root directory. Edit files here, then use `/reload` in WoW (or restart client) for Lua/TOC changes. WoW does not hot-reload changed Lua files while running; live panel settings do apply immediately.
 
 ## Project layout
 
 ```text
-ComboPoints/
-  ComboPoints.toc  # Midnight interface metadata and saved variable declaration
-  ComboPoints.lua  # tracker, settings UI, slash commands
+ComboPoints.toc     # Midnight interface metadata and saved variable declaration
+ComboPoints.lua     # tracker, settings UI, slash commands
+.pkgmeta            # packager config (manual changelog)
+CHANGELOG.md         # release notes, edit before tagging a release
 ```
+
+The repo root is the addon root — `BigWigsMods/packager` requires the `.toc` to live at the git checkout root, so nothing lives in a `ComboPoints/` subfolder anymore.
 
 Uses current namespaced APIs where available: `C_SpecializationInfo`, `C_UI`, and `Enum.PowerType`. It avoids protected action-bar manipulation and creates only addon-owned UI frames.
