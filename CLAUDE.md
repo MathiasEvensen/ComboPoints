@@ -28,10 +28,10 @@ Settings are stored per character. In the **Profiles** tab, select a saved chara
 ```text
 ComboPoints.toc     # Midnight interface metadata and saved variable declaration
 ComboPoints.lua     # tracker, settings UI, slash commands
-.pkgmeta            # packager config (manual changelog)
-CHANGELOG.md         # release notes, edit before tagging a release
+.pkgmeta            # packager config (manual changelog, ignores CLAUDE.md)
+CHANGELOG.md        # release notes, edit before tagging a release
 ```
 
-The repo root is the addon root — `BigWigsMods/packager` requires the `.toc` to live at the git checkout root, so nothing lives in a `ComboPoints/` subfolder anymore.
+The repo root is the addon root — `BigWigsMods/packager` (see `.github/workflows/release.yml`) and CurseForge's own auto-packaging both require the `.toc` at the git checkout root, which is the standard layout for single-addon WoW repos.
 
 Uses current namespaced APIs where available: `C_SpecializationInfo`, `C_UI`, and `Enum.PowerType`. It avoids protected action-bar manipulation and creates only addon-owned UI frames.
