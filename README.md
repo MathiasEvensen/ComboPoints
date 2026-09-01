@@ -1,5 +1,7 @@
 # Combo Points
 
+[![Release](https://github.com/MathiasEvensen/ComboPoints/actions/workflows/release.yml/badge.svg)](https://github.com/MathiasEvensen/ComboPoints/actions/workflows/release.yml)
+
 A World of Warcraft addon that shows a customizable point tracker for:
 
 - Feral Druids in Cat Form and all Rogues — Combo Points
