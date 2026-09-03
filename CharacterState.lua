@@ -44,7 +44,7 @@ function ns.CopyProfileToCurrent(sourceKey)
     end
 
     local db = ns.CopyTable(source)
-    db.position = ns.CopyTable(source.position or ns.DEFAULTS.position)
+    db.position = db.position or ns.CopyTable(ns.DEFAULTS.position)
     db.snapToFrame = source.snapToFrame == true
     ns.db = db
     ComboPointsDB.profiles[ns.currentCharacterKey] = db
@@ -63,8 +63,8 @@ local function GetSpecializationID()
     return C_SpecializationInfo.GetSpecializationInfo(specialization)
 end
 
-function ns.IsTrackedClass()
-    local _, classFile = UnitClass("player")
+function ns.IsTrackedClass(classFile)
+    classFile = classFile or select(2, UnitClass("player"))
     local specializationID = GetSpecializationID()
     if classFile == "DRUID" then
         return specializationID == 103 and GetShapeshiftFormID() == 1 -- Feral Cat Form
@@ -79,8 +79,8 @@ function ns.IsTrackedClass()
     return classFile == "ROGUE" or classFile == "PALADIN" or classFile == "WARLOCK"
 end
 
-function ns.GetPowerType()
-    local _, classFile = UnitClass("player")
+function ns.GetPowerType(classFile)
+    classFile = classFile or select(2, UnitClass("player"))
     if classFile == "DRUID" or classFile == "ROGUE" then
         return Enum.PowerType.ComboPoints
     end

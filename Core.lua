@@ -36,7 +36,11 @@ ns.configPanel = nil
 ns.pointFrames = {}
 ns.activePowerType = nil
 ns.currentCharacterKey = nil
-ns.UpdateConfigPreview = nil
+
+-- Replaced with the real refresher once the config panel builds its live
+-- preview (ConfigPanel.lua BuildPreviewSection); a no-op until then so
+-- callers can invoke it unconditionally.
+ns.UpdateConfigPreview = function() end
 
 function ns.GetAttachmentFrame(frameName)
     return (frameName and _G[frameName]) or UIParent

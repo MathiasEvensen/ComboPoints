@@ -7,6 +7,43 @@ local function SetPointVisual(point, active, index)
 end
 ns.SetPointVisual = SetPointVisual
 
+-- Shared by the live tracker (CreateTracker/ApplyLayout) and the config
+-- panel's live preview (ConfigPanel.lua BuildPreviewSection), so both stay
+-- visually in sync.
+
+function ns.CreatePointFrame(parent)
+    local point = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    point.texture = point:CreateTexture(nil, "ARTWORK")
+    point.mask = point:CreateMaskTexture()
+    point.mask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    return point
+end
+
+function ns.StylePointFrame(point, db, borderInset, edgeSize, isRound)
+    point:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = db.showBorder and "Interface\\Buttons\\WHITE8x8" or nil,
+        edgeSize = edgeSize,
+        insets = { left = borderInset, right = borderInset, top = borderInset, bottom = borderInset },
+    })
+    local background = db.showBackground and db.backgroundColor or { r = 0, g = 0, b = 0, a = 0 }
+    point:SetBackdropColor(background.r, background.g, background.b, background.a)
+    point:SetBackdropBorderColor(db.borderColor.r, db.borderColor.g, db.borderColor.b, db.borderColor.a)
+    if isRound and not point.isMasked then
+        point.texture:AddMaskTexture(point.mask)
+        point.isMasked = true
+    elseif not isRound and point.isMasked then
+        point.texture:RemoveMaskTexture(point.mask)
+        point.isMasked = false
+    end
+    point.texture:ClearAllPoints()
+    point.texture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
+    point.texture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
+    point.mask:ClearAllPoints()
+    point.mask:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
+    point.mask:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
+end
+
 function ns.ApplyLayout()
     local tracker, db = ns.tracker, ns.db
     if not tracker or not db then
@@ -23,28 +60,7 @@ function ns.ApplyLayout()
     local borderInset = db.showBorder and db.borderSize or 0
     for index, point in ipairs(pointFrames) do
         point:SetSize(db.pointWidth, db.pointHeight)
-        point:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = db.showBorder and "Interface\\Buttons\\WHITE8x8" or nil,
-            edgeSize = db.borderSize,
-            insets = { left = borderInset, right = borderInset, top = borderInset, bottom = borderInset },
-        })
-        local background = db.showBackground and db.backgroundColor or { r = 0, g = 0, b = 0, a = 0 }
-        point:SetBackdropColor(background.r, background.g, background.b, background.a)
-        point:SetBackdropBorderColor(db.borderColor.r, db.borderColor.g, db.borderColor.b, db.borderColor.a)
-        if isRound and not point.isMasked then
-            point.texture:AddMaskTexture(point.mask)
-            point.isMasked = true
-        elseif not isRound and point.isMasked then
-            point.texture:RemoveMaskTexture(point.mask)
-            point.isMasked = false
-        end
-        point.texture:ClearAllPoints()
-        point.texture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
-        point.texture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
-        point.mask:ClearAllPoints()
-        point.mask:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
-        point.mask:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
+        ns.StylePointFrame(point, db, borderInset, db.borderSize, isRound)
 
         point:ClearAllPoints()
         if index == 1 then
@@ -55,9 +71,7 @@ function ns.ApplyLayout()
     end
 
     tracker:SetSize((db.pointWidth * #pointFrames) + (db.spacing * (#pointFrames - 1)), db.pointHeight)
-    if ns.UpdateConfigPreview then
-        ns.UpdateConfigPreview()
-    end
+    ns.UpdateConfigPreview()
 end
 
 function ns.UpdateTracker()
@@ -66,8 +80,9 @@ function ns.UpdateTracker()
         return
     end
 
-    ns.activePowerType = ns.GetPowerType()
-    local isSupportedSpec = ns.IsTrackedClass()
+    local _, classFile = UnitClass("player")
+    ns.activePowerType = ns.GetPowerType(classFile)
+    local isSupportedSpec = ns.IsTrackedClass(classFile)
     local shouldShow = db.enabled and ns.activePowerType and (isSupportedSpec or not db.onlySupportedSpecs) and (not db.onlyInCombat or InCombatLockdown())
     if not shouldShow then
         tracker:Hide()
@@ -120,13 +135,7 @@ function ns.CreateTracker()
 
     local pointFrames = ns.pointFrames
     for index = 1, 10 do
-        local point = CreateFrame("Frame", nil, tracker, "BackdropTemplate")
-        point.texture = point:CreateTexture(nil, "ARTWORK")
-        point.texture:SetAllPoints()
-        point.mask = point:CreateMaskTexture()
-        point.mask:SetAllPoints()
-        point.mask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-        pointFrames[index] = point
+        pointFrames[index] = ns.CreatePointFrame(tracker)
     end
 
     ns.ApplyLayout()

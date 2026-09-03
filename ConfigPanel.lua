@@ -1,4 +1,6 @@
 local ADDON_NAME, ns = ...
+-- Widgets.lua must run before this file (see load order in ComboPoints.toc)
+-- so ns.Widgets is already populated here.
 local Widgets = ns.Widgets
 
 -- === Layout tab: size/spacing/shape, position reset, enable/combat/spec checks ===
@@ -198,9 +200,7 @@ local function BuildColorsTab(configPanel, colorsPage)
     colorModeButton:SetScript("OnClick", function()
         ns.db.useIndividualColors = not ns.db.useIndividualColors
         RefreshColorMode()
-        if ns.UpdateConfigPreview then
-            ns.UpdateConfigPreview()
-        end
+        ns.UpdateConfigPreview()
         ns.UpdateTracker()
     end)
     RefreshColorMode()
@@ -421,11 +421,7 @@ local function BuildPreviewSection(configPanel)
         state.labelFrame:SetText(state.label)
         state.points = {}
         for index = 1, 5 do
-            local point = CreateFrame("Frame", nil, preview, "BackdropTemplate")
-            point.texture = point:CreateTexture(nil, "ARTWORK")
-            point.mask = point:CreateMaskTexture()
-            point.mask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-            state.points[index] = point
+            state.points[index] = ns.CreatePointFrame(preview)
         end
     end
 
@@ -448,28 +444,7 @@ local function BuildPreviewSection(configPanel)
         for _, state in ipairs(previewStates) do
             for index, point in ipairs(state.points) do
                 point:SetSize(pointWidth, pointHeight)
-                point:SetBackdrop({
-                    bgFile = "Interface\\Buttons\\WHITE8x8",
-                    edgeFile = db.showBorder and "Interface\\Buttons\\WHITE8x8" or nil,
-                    edgeSize = borderInset,
-                    insets = { left = borderInset, right = borderInset, top = borderInset, bottom = borderInset },
-                })
-                local background = db.showBackground and db.backgroundColor or { r = 0, g = 0, b = 0, a = 0 }
-                point:SetBackdropColor(background.r, background.g, background.b, background.a)
-                point:SetBackdropBorderColor(db.borderColor.r, db.borderColor.g, db.borderColor.b, db.borderColor.a)
-                if isRound and not point.isMasked then
-                    point.texture:AddMaskTexture(point.mask)
-                    point.isMasked = true
-                elseif not isRound and point.isMasked then
-                    point.texture:RemoveMaskTexture(point.mask)
-                    point.isMasked = false
-                end
-                point.texture:ClearAllPoints()
-                point.texture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
-                point.texture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
-                point.mask:ClearAllPoints()
-                point.mask:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
-                point.mask:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
+                ns.StylePointFrame(point, db, borderInset, borderInset, isRound)
                 ns.SetPointVisual(point, index <= state.active, index)
 
                 point:ClearAllPoints()

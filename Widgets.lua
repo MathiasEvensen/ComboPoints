@@ -10,6 +10,19 @@ function Widgets.AddLabel(parent, text, x, y)
     return label
 end
 
+local function CreateBareSlider(parent, x, y, width, minValue, maxValue, step)
+    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
+    slider:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
+    slider:SetWidth(width)
+    slider:SetMinMaxValues(minValue, maxValue)
+    slider:SetValueStep(step)
+    slider:SetObeyStepOnDrag(true)
+    slider.Low:SetText("")
+    slider.High:SetText("")
+    slider.Text:SetText("")
+    return slider
+end
+
 function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, width)
     x = x or 18
     width = width or (parent:GetWidth() - 36)
@@ -18,16 +31,8 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
     local valueLabel = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     valueLabel:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y)
 
-    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
-    slider:SetWidth(width)
-    slider:SetMinMaxValues(minValue, maxValue)
-    slider:SetValueStep(step)
-    slider:SetObeyStepOnDrag(true)
+    local slider = CreateBareSlider(parent, x, y, width, minValue, maxValue, step)
     slider:SetValue(ns.db[key])
-    slider.Low:SetText("")
-    slider.High:SetText("")
-    slider.Text:SetText("")
 
     slider:SetScript("OnValueChanged", function(_, value)
         value = math.floor((value / step) + 0.5) * step
@@ -49,16 +54,8 @@ function Widgets.AddPositionSlider(parent, label, key, y, x, width)
     input:SetAutoFocus(false)
     input:SetText(string.format("%d", ns.db.position[key]))
 
-    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
-    slider:SetWidth(width)
-    slider:SetMinMaxValues(-500, 500)
-    slider:SetValueStep(1)
-    slider:SetObeyStepOnDrag(true)
+    local slider = CreateBareSlider(parent, x, y, width, -500, 500, 1)
     slider:SetValue(ns.db.position[key])
-    slider.Low:SetText("")
-    slider.High:SetText("")
-    slider.Text:SetText("")
 
     local function SetPosition(value)
         value = math.max(-500, math.min(500, math.floor(value + (value >= 0 and 0.5 or -0.5))))
@@ -128,7 +125,7 @@ function Widgets.AddColorPickerButton(parent, label, color, y, applyLayout, x, w
         previewColor:SetColorTexture(color.r, color.g, color.b, color.a)
         if applyLayout then
             ns.ApplyLayout()
-        elseif ns.UpdateConfigPreview then
+        else
             ns.UpdateConfigPreview()
         end
         ns.UpdateTracker()
