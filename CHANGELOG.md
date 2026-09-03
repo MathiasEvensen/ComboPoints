@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.4
 
 - Split `ComboPoints.lua` (1071 lines) into 7 files by responsibility (Core, CharacterState, Tracker, Widgets, ConfigPanel, SettingsCategory, Bindings). No functional changes.
 

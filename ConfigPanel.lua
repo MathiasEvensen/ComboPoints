@@ -3,7 +3,7 @@ local ADDON_NAME, ns = ...
 -- so ns.Widgets is already populated here.
 local Widgets = ns.Widgets
 
--- === Layout tab: size/spacing/shape, position reset, enable/combat/spec checks ===
+-- Layout tab: size/spacing/shape, position reset, enable/combat/spec checks
 
 local function BuildLayoutTab(configPanel, layoutPage)
     local enabledCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
