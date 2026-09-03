@@ -26,12 +26,20 @@ Settings are stored per character. In the **Profiles** tab, select a saved chara
 ## Project layout
 
 ```text
-ComboPoints.toc     # Midnight interface metadata and saved variable declaration
-ComboPoints.lua     # tracker, settings UI, slash commands
+ComboPoints.toc     # Midnight interface metadata, saved variable declaration, and Lua load order
+Core.lua            # namespace setup, defaults, addon frame, table utils
+CharacterState.lua  # per-character profile persistence, class/spec/power detection
+Tracker.lua         # point frames, layout, live power updates
+Widgets.lua         # reusable slider/label/color-picker builders for the config UI
+ConfigPanel.lua     # settings window: tabs (Layout/Colors/Style/Attach/Profiles) and live preview
+SettingsCategory.lua # WoW Settings → AddOns panel entry
+Bindings.lua        # slash commands and event wiring
 .pkgmeta            # packager config (manual changelog, ignores CLAUDE.md)
 CHANGELOG.md        # release notes, edit before tagging a release
 ```
 
 The repo root is the addon root — `BigWigsMods/packager` (see `.github/workflows/release.yml`) and CurseForge's own auto-packaging both require the `.toc` at the git checkout root, which is the standard layout for single-addon WoW repos.
+
+The Lua files share state through a single addon-scoped table: each file starts with `local ADDON_NAME, ns = ...`, since WoW's loader passes the same `(name, table)` pair to every file of an addon. Mutable state (`ns.db`, `ns.tracker`, `ns.configPanel`, `ns.pointFrames`) and cross-file functions (`ns.ApplyLayout`, `ns.UpdateTracker`, etc.) live on `ns`. Load order in `ComboPoints.toc` matters only for top-level execution (e.g. `Core.lua` must set `ns.DEFAULTS` before `CharacterState.lua` uses it); functions that read `ns.*` at call time work regardless of file order.
 
 Uses current namespaced APIs where available: `C_SpecializationInfo`, `C_UI`, and `Enum.PowerType`. It avoids protected action-bar manipulation and creates only addon-owned UI frames.
