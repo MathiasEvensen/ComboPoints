@@ -80,9 +80,8 @@ function ns.UpdateTracker()
         return
     end
 
-    local _, classFile = UnitClass("player")
-    ns.activePowerType = ns.GetPowerType(classFile)
-    local isSupportedSpec = ns.IsTrackedClass(classFile)
+    ns.activePowerType = ns.GetPowerType(ns.classFile)
+    local isSupportedSpec = ns.IsTrackedClass(ns.classFile)
     local shouldShow = db.enabled and ns.activePowerType and (isSupportedSpec or not db.onlySupportedSpecs) and (not db.onlyInCombat or InCombatLockdown())
     if not shouldShow then
         tracker:Hide()

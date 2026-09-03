@@ -36,6 +36,7 @@ ns.configPanel = nil
 ns.pointFrames = {}
 ns.activePowerType = nil
 ns.currentCharacterKey = nil
+ns.classFile = nil
 
 -- Replaced with the real refresher once the config panel builds its live
 -- preview (ConfigPanel.lua BuildPreviewSection); a no-op until then so

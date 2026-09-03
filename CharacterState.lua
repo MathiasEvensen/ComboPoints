@@ -9,6 +9,7 @@ end
 
 function ns.LoadCharacterProfile()
     ns.currentCharacterKey = GetCharacterKey()
+    ns.classFile = select(2, UnitClass("player"))
     ComboPointsDB = ComboPointsDB or {}
     if not ComboPointsDB.profiles then
         local legacySettings = ns.CopyTable(ComboPointsDB)

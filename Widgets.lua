@@ -89,7 +89,7 @@ function Widgets.AddPositionSlider(parent, label, key, y, x, width)
     return slider
 end
 
-function Widgets.AddColorPickerButton(parent, label, color, y, applyLayout, x, width)
+function Widgets.AddColorPickerButton(parent, label, getColor, y, applyLayout, x, width)
     local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     width = width or 180
     button:SetSize(width, 26)
@@ -118,6 +118,7 @@ function Widgets.AddColorPickerButton(parent, label, color, y, applyLayout, x, w
     end)
 
     local function ApplyColor(r, g, b, a)
+        local color = getColor()
         color.r = r
         color.g = g
         color.b = b
@@ -131,8 +132,12 @@ function Widgets.AddColorPickerButton(parent, label, color, y, applyLayout, x, w
         ns.UpdateTracker()
     end
 
-    ApplyColor(color.r, color.g, color.b, color.a)
+    do
+        local color = getColor()
+        ApplyColor(color.r, color.g, color.b, color.a)
+    end
     button:SetScript("OnClick", function()
+        local color = getColor()
         local previousValues = { r = color.r, g = color.g, b = color.b, a = color.a }
         ColorPickerFrame:SetupColorPickerAndShow({
             r = color.r,
@@ -142,7 +147,7 @@ function Widgets.AddColorPickerButton(parent, label, color, y, applyLayout, x, w
             hasOpacity = true,
             swatchFunc = function()
                 local r, g, b = ColorPickerFrame:GetColorRGB()
-                ApplyColor(r, g, b, color.a)
+                ApplyColor(r, g, b, getColor().a)
             end,
             opacityFunc = function()
                 local r, g, b = ColorPickerFrame:GetColorRGB()

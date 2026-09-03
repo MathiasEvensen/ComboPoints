@@ -25,9 +25,8 @@ SlashCmdList.COMBOPOINTS = function(message)
         print("Combo Points: position reset.")
     elseif message == "reset" then
         ns.ResetCurrentProfile()
-        ns.ApplyLayout()
-        ns.UpdateTracker()
         print("Combo Points: defaults restored.")
+        C_UI.Reload()
     elseif message == "toggle" or message == "on" or message == "off" then
         ns.db.enabled = message == "off" and false or (message == "on" or not ns.db.enabled)
         ns.UpdateTracker()
