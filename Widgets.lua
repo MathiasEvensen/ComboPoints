@@ -11,7 +11,6 @@ function Widgets.AddLabel(parent, text, x, y)
 end
 
 function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, width)
-    local db = ns.db
     x = x or 18
     width = width or (parent:GetWidth() - 36)
     Widgets.AddLabel(parent, label, x, y)
@@ -25,31 +24,30 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
     slider:SetMinMaxValues(minValue, maxValue)
     slider:SetValueStep(step)
     slider:SetObeyStepOnDrag(true)
-    slider:SetValue(db[key])
+    slider:SetValue(ns.db[key])
     slider.Low:SetText("")
     slider.High:SetText("")
     slider.Text:SetText("")
 
     slider:SetScript("OnValueChanged", function(_, value)
         value = math.floor((value / step) + 0.5) * step
-        db[key] = value
+        ns.db[key] = value
         valueLabel:SetText(string.format("%.0f", value))
         ns.ApplyLayout()
         ns.UpdateTracker()
     end)
-    valueLabel:SetText(string.format("%.0f", db[key]))
+    valueLabel:SetText(string.format("%.0f", ns.db[key]))
     return slider
 end
 
 function Widgets.AddPositionSlider(parent, label, key, y, x, width)
-    local db = ns.db
     Widgets.AddLabel(parent, label, x, y)
 
     local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     input:SetSize(54, 22)
     input:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y + 4)
     input:SetAutoFocus(false)
-    input:SetText(string.format("%d", db.position[key]))
+    input:SetText(string.format("%d", ns.db.position[key]))
 
     local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
@@ -57,14 +55,14 @@ function Widgets.AddPositionSlider(parent, label, key, y, x, width)
     slider:SetMinMaxValues(-500, 500)
     slider:SetValueStep(1)
     slider:SetObeyStepOnDrag(true)
-    slider:SetValue(db.position[key])
+    slider:SetValue(ns.db.position[key])
     slider.Low:SetText("")
     slider.High:SetText("")
     slider.Text:SetText("")
 
     local function SetPosition(value)
         value = math.max(-500, math.min(500, math.floor(value + (value >= 0 and 0.5 or -0.5))))
-        db.position[key] = value
+        ns.db.position[key] = value
         input:SetText(string.format("%d", value))
         ns.ApplyLayout()
         ns.UpdateTracker()
@@ -79,17 +77,17 @@ function Widgets.AddPositionSlider(parent, label, key, y, x, width)
             value = math.max(-500, math.min(500, value))
             slider:SetValue(value)
         else
-            self:SetText(string.format("%d", db.position[key]))
+            self:SetText(string.format("%d", ns.db.position[key]))
         end
         self:ClearFocus()
     end)
     input:SetScript("OnEscapePressed", function(self)
-        self:SetText(string.format("%d", db.position[key]))
+        self:SetText(string.format("%d", ns.db.position[key]))
         self:ClearFocus()
     end)
     slider.RefreshPosition = function()
-        input:SetText(string.format("%d", db.position[key]))
-        slider:SetValue(db.position[key])
+        input:SetText(string.format("%d", ns.db.position[key]))
+        slider:SetValue(ns.db.position[key])
     end
     return slider
 end

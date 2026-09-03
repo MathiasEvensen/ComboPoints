@@ -4,14 +4,12 @@ local Widgets = ns.Widgets
 -- === Layout tab: size/spacing/shape, position reset, enable/combat/spec checks ===
 
 local function BuildLayoutTab(configPanel, layoutPage)
-    local db = ns.db
-
     local enabledCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
     enabledCheck:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -14)
     enabledCheck.Text:SetText("Enable tracker")
-    enabledCheck:SetChecked(db.enabled)
+    enabledCheck:SetChecked(ns.db.enabled)
     enabledCheck:SetScript("OnClick", function(self)
-        db.enabled = self:GetChecked() and true or false
+        ns.db.enabled = self:GetChecked() and true or false
         ns.UpdateTracker()
     end)
 
@@ -23,10 +21,10 @@ local function BuildLayoutTab(configPanel, layoutPage)
     shapeButton:SetSize(224, 26)
     shapeButton:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -260)
     local function RefreshShapeText()
-        shapeButton:SetText("Shape: " .. (db.shape == "round" and "Round" or "Square"))
+        shapeButton:SetText("Shape: " .. (ns.db.shape == "round" and "Round" or "Square"))
     end
     shapeButton:SetScript("OnClick", function()
-        db.shape = db.shape == "round" and "square" or "round"
+        ns.db.shape = ns.db.shape == "round" and "square" or "round"
         RefreshShapeText()
         ns.ApplyLayout()
         ns.UpdateTracker()
@@ -42,13 +40,13 @@ local function BuildLayoutTab(configPanel, layoutPage)
     detachHint:SetJustifyH("CENTER")
     detachHint:SetText("Attached to a frame. Open Attach, then choose Detach to screen to free-move.")
     configPanel.RefreshUnlockText = function()
-        local canFreeMove = not db.snapToFrame
+        local canFreeMove = not ns.db.snapToFrame
         unlockButton:SetEnabled(canFreeMove)
         unlockButton:SetText(canFreeMove and (ns.tracker.isUnlocked and "Lock position" or "Unlock position") or "Detach to free-move")
         detachHint:SetShown(not canFreeMove)
     end
     unlockButton:SetScript("OnClick", function()
-        if db.snapToFrame then
+        if ns.db.snapToFrame then
             return
         end
         ns.tracker.isUnlocked = not ns.tracker.isUnlocked
@@ -78,18 +76,18 @@ local function BuildLayoutTab(configPanel, layoutPage)
     local combatOnlyCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
     combatOnlyCheck:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 244, -358)
     combatOnlyCheck.Text:SetText("Only show in combat")
-    combatOnlyCheck:SetChecked(db.onlyInCombat)
+    combatOnlyCheck:SetChecked(ns.db.onlyInCombat)
     combatOnlyCheck:SetScript("OnClick", function(self)
-        db.onlyInCombat = self:GetChecked() and true or false
+        ns.db.onlyInCombat = self:GetChecked() and true or false
         ns.UpdateTracker()
     end)
 
     local supportedSpecsCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
     supportedSpecsCheck:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -358)
     supportedSpecsCheck.Text:SetText("Only show usable specs")
-    supportedSpecsCheck:SetChecked(db.onlySupportedSpecs)
+    supportedSpecsCheck:SetChecked(ns.db.onlySupportedSpecs)
     supportedSpecsCheck:SetScript("OnClick", function(self)
-        db.onlySupportedSpecs = self:GetChecked() and true or false
+        ns.db.onlySupportedSpecs = self:GetChecked() and true or false
         ns.UpdateTracker()
     end)
 end
@@ -175,32 +173,30 @@ end
 -- === Colors tab: static or per-point active colors, and the empty color ===
 
 local function BuildColorsTab(configPanel, colorsPage)
-    local db = ns.db
-
     local colorModeButton = CreateFrame("Button", nil, colorsPage, "UIPanelButtonTemplate")
     colorModeButton:SetSize(468, 26)
     colorModeButton:SetPoint("TOPLEFT", colorsPage, "TOPLEFT", 10, -14)
-    local staticColorButton = Widgets.AddColorPickerButton(colorsPage, "Static active color", db.color, -50, false, 10, 200)
-    Widgets.AddColorPickerButton(colorsPage, "Empty color", db.emptyColor, -50, false, 244, 200)
+    local staticColorButton = Widgets.AddColorPickerButton(colorsPage, "Static active color", ns.db.color, -50, false, 10, 200)
+    Widgets.AddColorPickerButton(colorsPage, "Empty color", ns.db.emptyColor, -50, false, 244, 200)
     local individualColorLabel = Widgets.AddLabel(colorsPage, "Individual active-point colors", 10, -92)
     local individualColorButtons = {}
     for index = 1, 5 do
         local column = (index - 1) % 2
         local row = math.floor((index - 1) / 2)
-        individualColorButtons[index] = Widgets.AddColorPickerButton(colorsPage, "Point " .. index .. " color", db.pointColors[index], -116 - (row * 34), false, 10 + (column * 234), 200)
+        individualColorButtons[index] = Widgets.AddColorPickerButton(colorsPage, "Point " .. index .. " color", ns.db.pointColors[index], -116 - (row * 34), false, 10 + (column * 234), 200)
     end
     local function RefreshColorMode()
-        colorModeButton:SetText(db.useIndividualColors and "Color mode: Individual" or "Color mode: One static color")
-        staticColorButton:SetShown(not db.useIndividualColors)
-        staticColorButton.preview:SetShown(not db.useIndividualColors)
-        individualColorLabel:SetShown(db.useIndividualColors)
+        colorModeButton:SetText(ns.db.useIndividualColors and "Color mode: Individual" or "Color mode: One static color")
+        staticColorButton:SetShown(not ns.db.useIndividualColors)
+        staticColorButton.preview:SetShown(not ns.db.useIndividualColors)
+        individualColorLabel:SetShown(ns.db.useIndividualColors)
         for _, button in ipairs(individualColorButtons) do
-            button:SetShown(db.useIndividualColors)
-            button.preview:SetShown(db.useIndividualColors)
+            button:SetShown(ns.db.useIndividualColors)
+            button.preview:SetShown(ns.db.useIndividualColors)
         end
     end
     colorModeButton:SetScript("OnClick", function()
-        db.useIndividualColors = not db.useIndividualColors
+        ns.db.useIndividualColors = not ns.db.useIndividualColors
         RefreshColorMode()
         if ns.UpdateConfigPreview then
             ns.UpdateConfigPreview()
@@ -213,17 +209,15 @@ end
 -- === Style tab: background/border on-off and colors, border thickness ===
 
 local function BuildStyleTab(configPanel, stylePage)
-    local db = ns.db
-
     local backgroundButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
     backgroundButton:SetSize(224, 26)
     backgroundButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -14)
-    Widgets.AddColorPickerButton(stylePage, "Box background color", db.backgroundColor, -14, true, 244, 200)
+    Widgets.AddColorPickerButton(stylePage, "Box background color", ns.db.backgroundColor, -14, true, 244, 200)
     local function RefreshBackgroundText()
-        backgroundButton:SetText(db.showBackground and "Box background: On" or "Box background: Off")
+        backgroundButton:SetText(ns.db.showBackground and "Box background: On" or "Box background: Off")
     end
     backgroundButton:SetScript("OnClick", function()
-        db.showBackground = not db.showBackground
+        ns.db.showBackground = not ns.db.showBackground
         RefreshBackgroundText()
         ns.ApplyLayout()
         ns.UpdateTracker()
@@ -233,12 +227,12 @@ local function BuildStyleTab(configPanel, stylePage)
     local borderButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
     borderButton:SetSize(224, 26)
     borderButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -50)
-    Widgets.AddColorPickerButton(stylePage, "Border color", db.borderColor, -50, true, 244, 200)
+    Widgets.AddColorPickerButton(stylePage, "Border color", ns.db.borderColor, -50, true, 244, 200)
     local function RefreshBorderText()
-        borderButton:SetText(db.showBorder and "Border: On" or "Border: Off")
+        borderButton:SetText(ns.db.showBorder and "Border: On" or "Border: Off")
     end
     borderButton:SetScript("OnClick", function()
-        db.showBorder = not db.showBorder
+        ns.db.showBorder = not ns.db.showBorder
         RefreshBorderText()
         ns.ApplyLayout()
         ns.UpdateTracker()
@@ -250,7 +244,6 @@ end
 -- === Attach tab: pick a UI frame to snap to, anchor point, offset sliders ===
 
 local function BuildAttachTab(configPanel, attachPage)
-    local db = ns.db
     local RefreshAttachmentText
     local RefreshAnchorButtons
     local RefreshOffsetControls
@@ -265,8 +258,8 @@ local function BuildAttachTab(configPanel, attachPage)
     detachButton:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 10, -120)
     detachButton:SetText("Detach to screen")
     detachButton:SetScript("OnClick", function()
-        db.snapToFrame = false
-        db.position.frameName = "UIParent"
+        ns.db.snapToFrame = false
+        ns.db.position.frameName = "UIParent"
         ns.ApplyLayout()
         ns.UpdateTracker()
         configPanel.RefreshUnlockText()
@@ -299,7 +292,7 @@ local function BuildAttachTab(configPanel, attachPage)
     local anchorButtons = {}
     RefreshAnchorButtons = function()
         for index, option in ipairs(anchorOptions) do
-            anchorButtons[index]:SetEnabled(db.position.point ~= option.point or db.position.relativePoint ~= option.point)
+            anchorButtons[index]:SetEnabled(ns.db.position.point ~= option.point or ns.db.position.relativePoint ~= option.point)
         end
     end
     for index, option in ipairs(anchorOptions) do
@@ -310,8 +303,8 @@ local function BuildAttachTab(configPanel, attachPage)
         button:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 10 + (column * 156), -188 - (row * 30))
         button:SetText(option.label)
         button:SetScript("OnClick", function()
-            db.position.point = option.point
-            db.position.relativePoint = option.point
+            ns.db.position.point = option.point
+            ns.db.position.relativePoint = option.point
             ns.ApplyLayout()
             ns.UpdateTracker()
             RefreshAnchorButtons()
@@ -347,8 +340,8 @@ local function BuildAttachTab(configPanel, attachPage)
     end
 
     RefreshAttachmentText = function()
-        local frameName = db.position.frameName
-        local attached = db.snapToFrame and frameName ~= "UIParent"
+        local frameName = ns.db.position.frameName
+        local attached = ns.db.snapToFrame and frameName ~= "UIParent"
         selectedFrameLabel:SetText(attached and "Attached to: " .. frameName or "Attached to: Screen")
     end
 
@@ -389,10 +382,10 @@ local function BuildAttachTab(configPanel, attachPage)
             local frame = GetNamedFrameUnderCursor()
             local frameName = frame and frame:GetName()
             if frameName then
-                db.position.frameName = frameName
-                db.position.x = 0
-                db.position.y = 0
-                db.snapToFrame = true
+                ns.db.position.frameName = frameName
+                ns.db.position.x = 0
+                ns.db.position.y = 0
+                ns.db.snapToFrame = true
                 ns.tracker.isUnlocked = false
                 ns.tracker:EnableMouse(false)
                 configPanel.RefreshUnlockText()
