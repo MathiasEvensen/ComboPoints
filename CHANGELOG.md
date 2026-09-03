@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.4
+## 1.1.0
 
 - Split `ComboPoints.lua` (1071 lines) into 7 files by responsibility (Core, CharacterState, Tracker, Widgets, ConfigPanel, SettingsCategory, Bindings). No functional changes.
 - Fixed round shape: background and border stayed square behind the round dot when both were enabled.
