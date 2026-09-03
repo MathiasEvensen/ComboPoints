@@ -11,34 +11,90 @@ ns.SetPointVisual = SetPointVisual
 -- panel's live preview (ConfigPanel.lua BuildPreviewSection), so both stay
 -- visually in sync.
 
+-- Background/border are plain color textures layered under the active/empty
+-- color texture, rather than a backdrop: SetBackdrop's edgeFile/bgFile are
+-- drawn outside the normal texture pipeline, so a mask added to point.texture
+-- alone can't round them off - the box stayed square behind a round dot.
+-- The border is 4 edge strips (top/bottom/left/right, picture-frame style)
+-- rather than one full-size quad: a full-size quad sits directly under the
+-- translucent background over the whole interior, so background color reads
+-- as background-over-border instead of background-over-nothing, darkening
+-- it. Strips only occupy the ring band, so the interior stays a single
+-- translucent layer like before.
+
 function ns.CreatePointFrame(parent)
-    local point = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local point = CreateFrame("Frame", nil, parent)
+    point.borderTopTexture = point:CreateTexture(nil, "BACKGROUND")
+    point.borderBottomTexture = point:CreateTexture(nil, "BACKGROUND")
+    point.borderLeftTexture = point:CreateTexture(nil, "BACKGROUND")
+    point.borderRightTexture = point:CreateTexture(nil, "BACKGROUND")
+    point.borderTextures = { point.borderTopTexture, point.borderBottomTexture, point.borderLeftTexture, point.borderRightTexture }
+    point.bgTexture = point:CreateTexture(nil, "BORDER")
     point.texture = point:CreateTexture(nil, "ARTWORK")
+
     point.mask = point:CreateMaskTexture()
     point.mask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+
+    point.outerMask = point:CreateMaskTexture()
+    point.outerMask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    point.outerMask:SetAllPoints(point)
+
     return point
 end
 
-function ns.StylePointFrame(point, db, borderInset, edgeSize, isRound)
-    point:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = db.showBorder and "Interface\\Buttons\\WHITE8x8" or nil,
-        edgeSize = edgeSize,
-        insets = { left = borderInset, right = borderInset, top = borderInset, bottom = borderInset },
-    })
+function ns.StylePointFrame(point, db, borderInset, isRound)
+    local borderColor = db.showBorder and db.borderColor or { r = 0, g = 0, b = 0, a = 0 }
+    for _, texture in ipairs(point.borderTextures) do
+        texture:SetColorTexture(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+    end
+
     local background = db.showBackground and db.backgroundColor or { r = 0, g = 0, b = 0, a = 0 }
-    point:SetBackdropColor(background.r, background.g, background.b, background.a)
-    point:SetBackdropBorderColor(db.borderColor.r, db.borderColor.g, db.borderColor.b, db.borderColor.a)
+    point.bgTexture:SetColorTexture(background.r, background.g, background.b, background.a)
+
     if isRound and not point.isMasked then
         point.texture:AddMaskTexture(point.mask)
+        point.bgTexture:AddMaskTexture(point.mask)
+        for _, texture in ipairs(point.borderTextures) do
+            texture:AddMaskTexture(point.outerMask)
+        end
         point.isMasked = true
     elseif not isRound and point.isMasked then
         point.texture:RemoveMaskTexture(point.mask)
+        point.bgTexture:RemoveMaskTexture(point.mask)
+        for _, texture in ipairs(point.borderTextures) do
+            texture:RemoveMaskTexture(point.outerMask)
+        end
         point.isMasked = false
     end
+
+    point.borderLeftTexture:ClearAllPoints()
+    point.borderLeftTexture:SetPoint("TOPLEFT", point, "TOPLEFT", 0, 0)
+    point.borderLeftTexture:SetPoint("BOTTOMLEFT", point, "BOTTOMLEFT", 0, 0)
+    point.borderLeftTexture:SetWidth(borderInset)
+
+    point.borderRightTexture:ClearAllPoints()
+    point.borderRightTexture:SetPoint("TOPRIGHT", point, "TOPRIGHT", 0, 0)
+    point.borderRightTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", 0, 0)
+    point.borderRightTexture:SetWidth(borderInset)
+
+    point.borderTopTexture:ClearAllPoints()
+    point.borderTopTexture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, 0)
+    point.borderTopTexture:SetPoint("TOPRIGHT", point, "TOPRIGHT", -borderInset, 0)
+    point.borderTopTexture:SetHeight(borderInset)
+
+    point.borderBottomTexture:ClearAllPoints()
+    point.borderBottomTexture:SetPoint("BOTTOMLEFT", point, "BOTTOMLEFT", borderInset, 0)
+    point.borderBottomTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, 0)
+    point.borderBottomTexture:SetHeight(borderInset)
+
+    point.bgTexture:ClearAllPoints()
+    point.bgTexture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
+    point.bgTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
+
     point.texture:ClearAllPoints()
     point.texture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
     point.texture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
+
     point.mask:ClearAllPoints()
     point.mask:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)
     point.mask:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
@@ -60,7 +116,7 @@ function ns.ApplyLayout()
     local borderInset = db.showBorder and db.borderSize or 0
     for index, point in ipairs(pointFrames) do
         point:SetSize(db.pointWidth, db.pointHeight)
-        ns.StylePointFrame(point, db, borderInset, db.borderSize, isRound)
+        ns.StylePointFrame(point, db, borderInset, isRound)
 
         point:ClearAllPoints()
         if index == 1 then

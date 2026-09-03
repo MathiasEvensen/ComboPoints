@@ -444,7 +444,7 @@ local function BuildPreviewSection(configPanel)
         for _, state in ipairs(previewStates) do
             for index, point in ipairs(state.points) do
                 point:SetSize(pointWidth, pointHeight)
-                ns.StylePointFrame(point, db, borderInset, borderInset, isRound)
+                ns.StylePointFrame(point, db, borderInset, isRound)
                 ns.SetPointVisual(point, index <= state.active, index)
 
                 point:ClearAllPoints()
