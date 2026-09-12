@@ -170,6 +170,69 @@ local function BuildProfilesTab(configPanel, profilesPage)
         configPanel.ResetProfileSelection()
     end)
     RefreshCopyControls()
+
+    local exportImportTitle = profilesPage:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    exportImportTitle:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 10, -180)
+    exportImportTitle:SetText("Export / import profile string")
+
+    local statusText = profilesPage:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    statusText:SetPoint("TOPLEFT", exportImportTitle, "BOTTOMLEFT", 0, -6)
+    statusText:SetWidth(478)
+    statusText:SetJustifyH("LEFT")
+    statusText:SetText("Export copies current profile as text below. Paste text below, then Import to replace current profile.")
+
+    local editBoxBg = CreateFrame("Frame", nil, profilesPage, "BackdropTemplate")
+    editBoxBg:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 10, -228)
+    editBoxBg:SetSize(478, 90)
+    editBoxBg:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    editBoxBg:SetBackdropColor(0, 0, 0, 0.6)
+    editBoxBg:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+    local scrollFrame = CreateFrame("ScrollFrame", nil, editBoxBg, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", editBoxBg, "TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("BOTTOMRIGHT", editBoxBg, "BOTTOMRIGHT", -28, 8)
+
+    local editBox = CreateFrame("EditBox", nil, scrollFrame)
+    editBox:SetMultiLine(true)
+    editBox:SetFontObject(ChatFontNormal)
+    editBox:SetAutoFocus(false)
+    editBox:SetMaxLetters(0)
+    editBox:SetWidth(442)
+    editBox:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+    end)
+    editBox:SetScript("OnTextChanged", function(self)
+        ScrollingEdit_OnTextChanged(self, scrollFrame)
+    end)
+    editBox:SetScript("OnCursorChanged", ScrollingEdit_OnCursorChanged)
+    editBox:SetScript("OnUpdate", ScrollingEdit_OnUpdate)
+    scrollFrame:SetScrollChild(editBox)
+
+    local exportButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
+    exportButton:SetSize(224, 26)
+    exportButton:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 10, -328)
+    exportButton:SetText("Export current profile")
+    exportButton:SetScript("OnClick", function()
+        editBox:SetText(ns.SerializeProfile(ns.db))
+        editBox:SetFocus()
+        editBox:HighlightText()
+        statusText:SetText("Profile text ready below. Press Ctrl+C to copy.")
+    end)
+
+    local importButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
+    importButton:SetSize(224, 26)
+    importButton:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 244, -328)
+    importButton:SetText("Import profile from text")
+    importButton:SetScript("OnClick", function()
+        local data = ns.DeserializeProfile(editBox:GetText())
+        if data and ns.ImportProfile(data) then
+            ns.ApplyLayout()
+            ns.UpdateTracker()
+            C_UI.Reload()
+        else
+            statusText:SetText("Import failed: pasted text is not a valid profile string.")
+        end
+    end)
 end
 
 -- === Colors tab: static or per-point active colors, and the empty color ===
@@ -347,6 +410,7 @@ local function BuildAttachTab(configPanel, attachPage)
 
     local function StopFramePicker()
         configPanel.isPickingFrame = false
+        configPanel:SetPropagateKeyboardInput(true)
         pickerHighlight:Hide()
         pickButton:SetText("Pick frame")
     end
@@ -370,15 +434,18 @@ local function BuildAttachTab(configPanel, attachPage)
         end
     end)
     configPanel:EnableKeyboard(true)
-    configPanel:SetScript("OnKeyDown", function(_, key)
+    configPanel:SetPropagateKeyboardInput(true)
+    configPanel:SetScript("OnKeyDown", function(self, key)
         if not configPanel.isPickingFrame then
             return
         end
         if key == "ESCAPE" then
+            self:SetPropagateKeyboardInput(false)
             StopFramePicker()
             return
         end
         if key == "ENTER" or key == "SPACE" then
+            self:SetPropagateKeyboardInput(false)
             local frame = GetNamedFrameUnderCursor()
             local frameName = frame and frame:GetName()
             if frameName then
@@ -465,21 +532,38 @@ end
 
 -- === Panel frame itself: chrome, tabs/pages, wires the sections above together ===
 
+function ns.ResetConfigPosition()
+    ns.db.configPosition = ns.CopyTable(ns.DEFAULTS.configPosition)
+    if ns.configPanel then
+        local position = ns.db.configPosition
+        ns.configPanel:ClearAllPoints()
+        ns.configPanel:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
+    end
+end
+
 function ns.CreateConfigPanel()
     local configPanel = CreateFrame("Frame", ADDON_NAME .. "Config", UIParent, "BackdropTemplate")
     ns.configPanel = configPanel
     configPanel:SetSize(520, 610)
     configPanel:SetResizeBounds(500, 610, 900, 900)
     configPanel:SetResizable(true)
-    configPanel:SetPoint("CENTER")
+    local configPosition = ns.db.configPosition
+    configPanel:SetPoint(configPosition.point, UIParent, configPosition.relativePoint, configPosition.x, configPosition.y)
     configPanel:SetMovable(true)
     configPanel:EnableMouse(true)
     configPanel:RegisterForDrag("LeftButton")
     configPanel:SetScript("OnDragStart", configPanel.StartMoving)
-    configPanel:SetScript("OnDragStop", configPanel.StopMovingOrSizing)
+    local function SaveConfigPosition()
+        local point, _, relativePoint, x, y = configPanel:GetPoint()
+        ns.db.configPosition = { point = point, relativePoint = relativePoint, x = math.floor(x + 0.5), y = math.floor(y + 0.5) }
+    end
+    configPanel:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        SaveConfigPosition()
+    end)
     configPanel:SetFrameStrata("DIALOG")
     configPanel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
-    configPanel:SetBackdropColor(0, 0, 0, 0.9)
+    configPanel:SetBackdropColor(0, 0, 0, 0.95)
 
     local title = configPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
     title:SetPoint("TOP", 0, -16)
@@ -496,6 +580,10 @@ function ns.CreateConfigPanel()
     resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     resizeGrip:SetScript("OnMouseDown", function()
         configPanel:StartSizing("BOTTOMRIGHT")
+        local focus = GetCurrentKeyboardFocus()
+        if focus then
+            focus:ClearFocus()
+        end
     end)
     resizeGrip:SetScript("OnMouseUp", function()
         configPanel:StopMovingOrSizing()

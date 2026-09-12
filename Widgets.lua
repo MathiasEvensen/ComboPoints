@@ -28,20 +28,37 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
     width = width or (parent:GetWidth() - 36)
     Widgets.AddLabel(parent, label, x, y)
 
-    local valueLabel = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    valueLabel:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y)
+    local slider
+    local valueInput = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+    valueInput:SetSize(46, 20)
+    valueInput:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y + 2)
+    valueInput:SetAutoFocus(false)
+    valueInput:SetNumeric(true)
+    valueInput:SetScript("OnEnterPressed", function(self)
+        local value = tonumber(self:GetText())
+        if value then
+            slider:SetValue(math.max(minValue, math.min(maxValue, value)))
+        else
+            self:SetText(string.format("%.0f", ns.db[key]))
+        end
+        self:ClearFocus()
+    end)
+    valueInput:SetScript("OnEscapePressed", function(self)
+        self:SetText(string.format("%.0f", ns.db[key]))
+        self:ClearFocus()
+    end)
 
-    local slider = CreateBareSlider(parent, x, y, width, minValue, maxValue, step)
+    slider = CreateBareSlider(parent, x, y, width, minValue, maxValue, step)
     slider:SetValue(ns.db[key])
 
     slider:SetScript("OnValueChanged", function(_, value)
         value = math.floor((value / step) + 0.5) * step
         ns.db[key] = value
-        valueLabel:SetText(string.format("%.0f", value))
+        valueInput:SetText(string.format("%.0f", value))
         ns.ApplyLayout()
         ns.UpdateTracker()
     end)
-    valueLabel:SetText(string.format("%.0f", ns.db[key]))
+    valueInput:SetText(string.format("%.0f", ns.db[key]))
     return slider
 end
 

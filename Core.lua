@@ -23,6 +23,7 @@ ns.DEFAULTS = {
     borderSize = 1,
     borderColor = { r = 0, g = 0, b = 0, a = 0.5338539481163025 },
     position = { point = "CENTER", relativePoint = "CENTER", x = 0, y = -180, frameName = "UIParent" },
+    configPosition = { point = "TOPLEFT", relativePoint = "CENTER", x = -260, y = 305 },
     snapToFrame = false,
     onlyInCombat = false,
     onlySupportedSpecs = true,

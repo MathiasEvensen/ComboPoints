@@ -15,12 +15,17 @@ ns.SetPointVisual = SetPointVisual
 -- color texture, rather than a backdrop: SetBackdrop's edgeFile/bgFile are
 -- drawn outside the normal texture pipeline, so a mask added to point.texture
 -- alone can't round them off - the box stayed square behind a round dot.
--- The border is 4 edge strips (top/bottom/left/right, picture-frame style)
--- rather than one full-size quad: a full-size quad sits directly under the
--- translucent background over the whole interior, so background color reads
--- as background-over-border instead of background-over-nothing, darkening
--- it. Strips only occupy the ring band, so the interior stays a single
--- translucent layer like before.
+--
+-- Square mode uses 4 edge strips (picture-frame style) so border color never
+-- sits under the interior fill. Round mode instead reuses one of those
+-- strips as a single full-size disc masked to a true circle (borderTopTexture
+-- doubles as this; the other three stay hidden) - a proper round outline
+-- needs a genuine circle, which a border-thickness-sized corner radius can't
+-- give. WoW's mask API can't subtract (no true ring/annulus without a custom
+-- ring-shaped texture asset), so this disc necessarily sits behind the whole
+-- interior: wherever the interior fill's alpha is below 1, border color
+-- shows through it. That's an accepted, deliberate trade-off for a genuinely
+-- round outline, not a bug - keep interior colors near-opaque to minimize it.
 
 function ns.CreatePointFrame(parent)
     local point = CreateFrame("Frame", nil, parent)
@@ -33,10 +38,10 @@ function ns.CreatePointFrame(parent)
     point.texture = point:CreateTexture(nil, "ARTWORK")
 
     point.mask = point:CreateMaskTexture()
-    point.mask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    point.mask:SetTexture("Interface\\Masks\\CircleMaskScalable", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
 
     point.outerMask = point:CreateMaskTexture()
-    point.outerMask:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    point.outerMask:SetTexture("Interface\\Masks\\CircleMaskScalable", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
     point.outerMask:SetAllPoints(point)
 
     return point
@@ -54,38 +59,47 @@ function ns.StylePointFrame(point, db, borderInset, isRound)
     if isRound and not point.isMasked then
         point.texture:AddMaskTexture(point.mask)
         point.bgTexture:AddMaskTexture(point.mask)
-        for _, texture in ipairs(point.borderTextures) do
-            texture:AddMaskTexture(point.outerMask)
-        end
+        point.borderTopTexture:AddMaskTexture(point.outerMask)
         point.isMasked = true
     elseif not isRound and point.isMasked then
         point.texture:RemoveMaskTexture(point.mask)
         point.bgTexture:RemoveMaskTexture(point.mask)
-        for _, texture in ipairs(point.borderTextures) do
-            texture:RemoveMaskTexture(point.outerMask)
-        end
+        point.borderTopTexture:RemoveMaskTexture(point.outerMask)
         point.isMasked = false
     end
 
-    point.borderLeftTexture:ClearAllPoints()
-    point.borderLeftTexture:SetPoint("TOPLEFT", point, "TOPLEFT", 0, 0)
-    point.borderLeftTexture:SetPoint("BOTTOMLEFT", point, "BOTTOMLEFT", 0, 0)
-    point.borderLeftTexture:SetWidth(borderInset)
+    if isRound then
+        point.borderTopTexture:ClearAllPoints()
+        point.borderTopTexture:SetAllPoints(point)
+        point.borderTopTexture:Show()
+        point.borderBottomTexture:Hide()
+        point.borderLeftTexture:Hide()
+        point.borderRightTexture:Hide()
+    else
+        for _, texture in ipairs(point.borderTextures) do
+            texture:Show()
+        end
 
-    point.borderRightTexture:ClearAllPoints()
-    point.borderRightTexture:SetPoint("TOPRIGHT", point, "TOPRIGHT", 0, 0)
-    point.borderRightTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", 0, 0)
-    point.borderRightTexture:SetWidth(borderInset)
+        point.borderLeftTexture:ClearAllPoints()
+        point.borderLeftTexture:SetPoint("TOPLEFT", point, "TOPLEFT", 0, 0)
+        point.borderLeftTexture:SetPoint("BOTTOMLEFT", point, "BOTTOMLEFT", 0, 0)
+        point.borderLeftTexture:SetWidth(borderInset)
 
-    point.borderTopTexture:ClearAllPoints()
-    point.borderTopTexture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, 0)
-    point.borderTopTexture:SetPoint("TOPRIGHT", point, "TOPRIGHT", -borderInset, 0)
-    point.borderTopTexture:SetHeight(borderInset)
+        point.borderRightTexture:ClearAllPoints()
+        point.borderRightTexture:SetPoint("TOPRIGHT", point, "TOPRIGHT", 0, 0)
+        point.borderRightTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", 0, 0)
+        point.borderRightTexture:SetWidth(borderInset)
 
-    point.borderBottomTexture:ClearAllPoints()
-    point.borderBottomTexture:SetPoint("BOTTOMLEFT", point, "BOTTOMLEFT", borderInset, 0)
-    point.borderBottomTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, 0)
-    point.borderBottomTexture:SetHeight(borderInset)
+        point.borderTopTexture:ClearAllPoints()
+        point.borderTopTexture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, 0)
+        point.borderTopTexture:SetPoint("TOPRIGHT", point, "TOPRIGHT", -borderInset, 0)
+        point.borderTopTexture:SetHeight(borderInset)
+
+        point.borderBottomTexture:ClearAllPoints()
+        point.borderBottomTexture:SetPoint("BOTTOMLEFT", point, "BOTTOMLEFT", borderInset, 0)
+        point.borderBottomTexture:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, 0)
+        point.borderBottomTexture:SetHeight(borderInset)
+    end
 
     point.bgTexture:ClearAllPoints()
     point.bgTexture:SetPoint("TOPLEFT", point, "TOPLEFT", borderInset, -borderInset)

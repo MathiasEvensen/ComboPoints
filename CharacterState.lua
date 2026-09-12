@@ -53,6 +53,68 @@ function ns.CopyProfileToCurrent(sourceKey)
     return true
 end
 
+-- Export/import: serialize a profile table to a pasteable Lua literal string
+-- and back. Deserialization runs the parsed chunk in an empty sandbox
+-- (setfenv to {}) so pasted text can only build a table, never touch globals.
+
+local function SerializeValue(value, parts)
+    local valueType = type(value)
+    if valueType == "table" then
+        table.insert(parts, "{")
+        for key, entry in pairs(value) do
+            if type(key) == "number" then
+                table.insert(parts, "[" .. key .. "]=")
+            else
+                table.insert(parts, "[" .. string.format("%q", key) .. "]=")
+            end
+            SerializeValue(entry, parts)
+            table.insert(parts, ",")
+        end
+        table.insert(parts, "}")
+    elseif valueType == "string" then
+        table.insert(parts, string.format("%q", value))
+    elseif valueType == "number" or valueType == "boolean" then
+        table.insert(parts, tostring(value))
+    else
+        table.insert(parts, "nil")
+    end
+end
+
+function ns.SerializeProfile(db)
+    local parts = {}
+    SerializeValue(ns.CopyTable(db), parts)
+    return table.concat(parts)
+end
+
+function ns.DeserializeProfile(text)
+    if type(text) ~= "string" or text:match("^%s*$") then
+        return nil
+    end
+    local chunk = loadstring("return " .. text)
+    if not chunk then
+        return nil
+    end
+    setfenv(chunk, {})
+    local ok, result = pcall(chunk)
+    if not ok or type(result) ~= "table" then
+        return nil
+    end
+    return result
+end
+
+function ns.ImportProfile(data)
+    if type(data) ~= "table" then
+        return false
+    end
+    local db = ns.CopyTable(data)
+    db.position = db.position or ns.CopyTable(ns.DEFAULTS.position)
+    db.snapToFrame = data.snapToFrame == true
+    ns.db = db
+    ComboPointsDB.profiles[ns.currentCharacterKey] = db
+    ns.CopyDefaults(ns.DEFAULTS, db)
+    return true
+end
+
 -- Class/spec detection: which resource to track, and whether the current
 -- class+spec actually uses that resource.
 

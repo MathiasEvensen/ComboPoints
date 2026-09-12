@@ -14,6 +14,7 @@ World of Warcraft **Midnight (12.0)** addon for:
 - `/cop unlock` — unlock tracker, then drag it.
 - `/cop lock` — lock tracker position.
 - `/cop resetpos` — reset only tracker position and detach it from a frame.
+- `/cop resetconfigpos` — reset only the settings window's screen position (in case it lands off-screen).
 - `/cop reset` — reset all defaults.
 - `/cop toggle`, `/cop on`, `/cop off` — enable/disable tracker (also a checkbox in Layout tab, default on).
 
