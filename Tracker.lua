@@ -114,6 +114,70 @@ function ns.StylePointFrame(point, db, borderInset, isRound)
     point.mask:SetPoint("BOTTOMRIGHT", point, "BOTTOMRIGHT", -borderInset, borderInset)
 end
 
+-- Counter text: a numeric readout of the current point total, drawn over the
+-- bar. It lives on a holder frame layered above the point frames, since child
+-- frames always render above their parent's own draw layers - a font string
+-- created straight on the tracker would sit behind every point.
+
+function ns.CreateCounterText(parent)
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetAllPoints(parent)
+    holder:SetFrameLevel(parent:GetFrameLevel() + 10)
+    return holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+end
+
+function ns.StyleCounterText(counter, db, fontSize)
+    local flags = db.counterOutline and "OUTLINE" or ""
+    if not ns.TrySetFont(counter, db.counterFont, fontSize, flags) then
+        -- Chosen font missing (locale build, or an addon that registered it is
+        -- gone), so fall back rather than leave the counter unreadable.
+        ns.TrySetFont(counter, ns.GetDefaultFontPath(), fontSize, flags)
+    end
+    -- The font object the counter was created from carries a drop shadow that
+    -- SetFont does not clear; it reads as a heavy smudge next to an outline, so
+    -- the outline flag is the only backdrop this counter gets.
+    counter:SetShadowColor(0, 0, 0, 0)
+    counter:SetShadowOffset(0, 0)
+    local color = db.counterColor
+    counter:SetTextColor(color.r, color.g, color.b, color.a)
+end
+
+function ns.ShouldShowCounter(db, current)
+    if not db.showCounter then
+        return false
+    end
+    return not (db.counterHideAtZero and (current or 0) == 0)
+end
+
+function ns.FormatCounterText(db, current, maximum)
+    if db.counterShowMax then
+        return current .. " / " .. maximum
+    end
+    return tostring(current)
+end
+
+-- The tracker frame is always sized for the full pool of 10 point frames while
+-- only the spec's maximum are shown, so the tracker's own center sits right of
+-- the visible bar's center. This is the horizontal correction from one to the
+-- other; ns.UpdateTracker records the visible count in tracker.visibleCount.
+function ns.GetCounterCenterOffset(db, visibleCount)
+    local pointCount = #ns.pointFrames
+    visibleCount = math.max(1, math.min(visibleCount or 5, pointCount))
+    local visibleWidth = (db.pointWidth * visibleCount) + (db.spacing * (visibleCount - 1))
+    local totalWidth = (db.pointWidth * pointCount) + (db.spacing * (pointCount - 1))
+    return (visibleWidth - totalWidth) / 2
+end
+
+function ns.AnchorCounterText(tracker, db)
+    local counter = tracker.counter
+    if not counter then
+        return
+    end
+    local centerOffset = ns.GetCounterCenterOffset(db, tracker.visibleCount)
+    counter:ClearAllPoints()
+    counter:SetPoint("CENTER", tracker, "CENTER", centerOffset + db.counterOffsetX, db.counterOffsetY)
+end
+
 function ns.ApplyLayout()
     local tracker, db = ns.tracker, ns.db
     if not tracker or not db then
@@ -141,6 +205,13 @@ function ns.ApplyLayout()
     end
 
     tracker:SetSize((db.pointWidth * #pointFrames) + (db.spacing * (#pointFrames - 1)), db.pointHeight)
+
+    if tracker.counter then
+        ns.AnchorCounterText(tracker, db)
+        ns.StyleCounterText(tracker.counter, db, db.counterFontSize)
+        tracker.counter:SetShown(ns.ShouldShowCounter(db, tracker.currentCount))
+    end
+
     ns.UpdateConfigPreview()
 end
 
@@ -165,6 +236,16 @@ function ns.UpdateTracker()
         point:SetShown(index <= maximum)
         SetPointVisual(point, index <= current, index)
     end
+
+    if tracker.counter then
+        local counted = math.min(current, maximum)
+        tracker.visibleCount = maximum
+        tracker.currentCount = counted
+        ns.AnchorCounterText(tracker, db)
+        tracker.counter:SetText(ns.FormatCounterText(db, counted, maximum))
+        tracker.counter:SetShown(ns.ShouldShowCounter(db, counted))
+    end
+
     tracker:Show()
 end
 
@@ -201,6 +282,8 @@ function ns.CreateTracker()
         self:StopMovingOrSizing()
         ns.SavePosition()
     end)
+
+    tracker.counter = ns.CreateCounterText(tracker)
 
     local pointFrames = ns.pointFrames
     for index = 1, 10 do

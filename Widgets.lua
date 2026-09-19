@@ -33,7 +33,9 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
     valueInput:SetSize(46, 20)
     valueInput:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y + 2)
     valueInput:SetAutoFocus(false)
-    valueInput:SetNumeric(true)
+    -- SetNumeric rejects the minus key, so only sliders with a non-negative
+    -- range can use it; negative-capable ones validate via tonumber below.
+    valueInput:SetNumeric(minValue >= 0)
     valueInput:SetScript("OnEnterPressed", function(self)
         local value = tonumber(self:GetText())
         if value then
@@ -176,4 +178,167 @@ function Widgets.AddColorPickerButton(parent, label, getColor, y, applyLayout, x
         })
     end)
     return button
+end
+
+-- Scrollable dropdown: Blizzard's UIDropDownMenuTemplate chrome (so it reads as
+-- a dropdown, not a button) driving a scrolling list of our own instead of a
+-- UIDropDownMenu menu, which has no scrolling and runs off the screen once the
+-- entry count grows. Config supplies GetItems (each { name, value, font }),
+-- GetValue, SetValue, GetDisplayName, and an optional emptyText.
+
+local DROPDOWN_ROW_HEIGHT = 20
+local DROPDOWN_LIST_HEIGHT = 180
+
+local function GetDropDownRegion(frame, suffix)
+    return frame[suffix] or _G[frame:GetName() .. suffix]
+end
+
+function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
+    local dropdown = CreateFrame("Frame", name, parent, "UIDropDownMenuTemplate")
+    dropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    UIDropDownMenu_SetWidth(dropdown, width)
+
+    local leftRegion = GetDropDownRegion(dropdown, "Left") or dropdown
+    local rightRegion = GetDropDownRegion(dropdown, "Right") or dropdown
+    local arrowButton = GetDropDownRegion(dropdown, "Button")
+
+    local list = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
+    list:SetHeight(DROPDOWN_LIST_HEIGHT)
+    list:SetFrameStrata("FULLSCREEN_DIALOG")
+    list:EnableMouse(true)
+    list:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    list:SetBackdropColor(0, 0, 0, 0.95)
+    list:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    list:Hide()
+
+    local scrollFrame = CreateFrame("ScrollFrame", nil, list, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", list, "TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -26, 8)
+    scrollFrame:EnableMouseWheel(true)
+    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+        local scroll = self:GetVerticalScroll() - (delta * DROPDOWN_ROW_HEIGHT * 2)
+        self:SetVerticalScroll(math.max(0, math.min(scroll, self:GetVerticalScrollRange())))
+    end)
+
+    local content = CreateFrame("Frame", nil, scrollFrame)
+    content:SetSize(width, DROPDOWN_LIST_HEIGHT - 16)
+    scrollFrame:SetScrollChild(content)
+
+    -- Opened upward when the list would otherwise run past the bottom of the
+    -- settings window, which depends on where the window sits and how tall the
+    -- user has dragged it, so it is decided per open rather than per control.
+    local function AnchorList()
+        local panel = ns.configPanel
+        local dropdownBottom = dropdown:GetBottom()
+        local panelBottom = panel and panel:GetBottom()
+        local openUpward = dropdownBottom and panelBottom and (dropdownBottom - DROPDOWN_LIST_HEIGHT) < panelBottom
+
+        list:ClearAllPoints()
+        if openUpward then
+            list:SetPoint("BOTTOMLEFT", leftRegion, "TOPLEFT", 0, -6)
+            list:SetPoint("BOTTOMRIGHT", rightRegion, "TOPRIGHT", 0, -6)
+        else
+            list:SetPoint("TOPLEFT", leftRegion, "BOTTOMLEFT", 0, 6)
+            list:SetPoint("TOPRIGHT", rightRegion, "BOTTOMRIGHT", 0, 6)
+        end
+    end
+
+    local rows = {}
+    local function AcquireRow(index)
+        local row = rows[index]
+        if not row then
+            row = CreateFrame("Button", nil, content)
+            row:SetHeight(DROPDOWN_ROW_HEIGHT)
+            row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(index - 1) * DROPDOWN_ROW_HEIGHT)
+            row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -(index - 1) * DROPDOWN_ROW_HEIGHT)
+            row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+            row.text = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+            row.text:SetPoint("LEFT", row, "LEFT", 4, 0)
+            row.text:SetJustifyH("LEFT")
+            row.text:SetWordWrap(false)
+            rows[index] = row
+        end
+        return row
+    end
+
+    -- Rebuilt on every open, so a profile saved or a font registered since the
+    -- panel was built still shows up.
+    local function RebuildRows()
+        local items = config.GetItems()
+        local selected = config.GetValue()
+        content:SetWidth(math.max(scrollFrame:GetWidth(), 1))
+        for index, item in ipairs(items) do
+            local row = AcquireRow(index)
+            local value = item.value
+            row.text:SetText(item.name)
+            if item.font then
+                if not ns.TrySetFont(row.text, item.font, 13, "") then
+                    ns.TrySetFont(row.text, ns.GetDefaultFontPath(), 13, "")
+                end
+            else
+                row.text:SetFontObject("GameFontNormal")
+            end
+            if value == selected then
+                row.text:SetTextColor(1, 0.82, 0)
+            else
+                row.text:SetTextColor(1, 1, 1)
+            end
+            row:SetScript("OnClick", function()
+                list:Hide()
+                config.SetValue(value)
+            end)
+            row:Show()
+        end
+        for index = #items + 1, #rows do
+            rows[index]:Hide()
+        end
+        content:SetHeight(math.max(DROPDOWN_LIST_HEIGHT - 16, #items * DROPDOWN_ROW_HEIGHT))
+        return #items
+    end
+
+    local function Toggle()
+        if list:IsShown() then
+            list:Hide()
+            return
+        end
+        AnchorList()
+        if RebuildRows() == 0 then
+            return
+        end
+        scrollFrame:SetVerticalScroll(0)
+        list:Show()
+    end
+
+    if arrowButton then
+        arrowButton:SetScript("OnClick", Toggle)
+    end
+
+    -- The template only makes its arrow clickable; this covers the text box so
+    -- the whole control opens the list, the way a dropdown is expected to.
+    local clickCatcher = CreateFrame("Button", nil, dropdown)
+    clickCatcher:SetPoint("TOPLEFT", leftRegion, "TOPLEFT", 0, 0)
+    clickCatcher:SetPoint("BOTTOMRIGHT", rightRegion, "BOTTOMRIGHT", 0, 0)
+    clickCatcher:SetScript("OnClick", Toggle)
+
+    parent:HookScript("OnHide", function()
+        list:Hide()
+    end)
+
+    local picker = { frame = dropdown, list = list }
+    function picker:Refresh()
+        UIDropDownMenu_SetText(dropdown, config.GetDisplayName(config.GetValue()))
+        if list:IsShown() then
+            RebuildRows()
+        end
+    end
+    function picker:SetEnabled(enabled)
+        if enabled then
+            UIDropDownMenu_EnableDropDown(dropdown)
+        else
+            UIDropDownMenu_DisableDropDown(dropdown)
+            list:Hide()
+        end
+        clickCatcher:SetEnabled(enabled)
+    end
+    return picker
 end

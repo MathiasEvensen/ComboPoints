@@ -104,69 +104,61 @@ local function BuildProfilesTab(configPanel, profilesPage)
     profilesHelp:SetPoint("TOPLEFT", profilesTitle, "BOTTOMLEFT", 0, -8)
     profilesHelp:SetText("Choose a source profile, then copy its settings, frame attachment, and position.")
 
-    local copyDropdown = CreateFrame("Frame", ADDON_NAME .. "CopyProfileDropdown", profilesPage, "UIDropDownMenuTemplate")
-    copyDropdown:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", -6, -64)
-    UIDropDownMenu_SetWidth(copyDropdown, 218)
-    UIDropDownMenu_SetText(copyDropdown, "Choose source character")
-
-    local copyApplyButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
-    copyApplyButton:SetSize(224, 26)
-    copyApplyButton:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 244, -72)
-    copyApplyButton:SetText("Copy selected profile")
-
-    local copySourceKeys = {}
-    local copySourceIndex
     local function GetSourceDisplayName(sourceKey)
         return sourceKey:match(" %- (.+)$") or sourceKey
     end
-    local function RefreshCopyControls()
-        copySourceKeys = ns.GetOtherCharacterKeys()
-        if #copySourceKeys == 0 then
-            UIDropDownMenu_SetText(copyDropdown, "No other character profiles")
-            copyDropdown.Button:SetEnabled(false)
-            copyApplyButton:SetEnabled(false)
-            return
-        end
 
-        copyDropdown.Button:SetEnabled(true)
-        if copySourceIndex and copySourceKeys[copySourceIndex] then
-            UIDropDownMenu_SetText(copyDropdown, GetSourceDisplayName(copySourceKeys[copySourceIndex]))
-            copyApplyButton:SetEnabled(true)
-        else
-            UIDropDownMenu_SetText(copyDropdown, "Choose source character")
-            copyApplyButton:SetEnabled(false)
-        end
+    local RefreshCopyControls
+    local copySourceKey
+    local copyDropdown = Widgets.AddScrollableDropdown(profilesPage, ADDON_NAME .. "CopyProfileDropdown", -6, -64, 218, {
+        GetItems = function()
+            local items = {}
+            for _, sourceKey in ipairs(ns.GetOtherCharacterKeys()) do
+                table.insert(items, { name = GetSourceDisplayName(sourceKey), value = sourceKey })
+            end
+            return items
+        end,
+        GetValue = function()
+            return copySourceKey
+        end,
+        SetValue = function(sourceKey)
+            copySourceKey = sourceKey
+            RefreshCopyControls()
+        end,
+        GetDisplayName = function(sourceKey)
+            if sourceKey then
+                return GetSourceDisplayName(sourceKey)
+            end
+            return #ns.GetOtherCharacterKeys() == 0 and "No other character profiles" or "Choose source character"
+        end,
+    })
 
-        UIDropDownMenu_Initialize(copyDropdown, function(_, level)
-            if level ~= 1 then
-                return
-            end
-            for index, sourceKey in ipairs(copySourceKeys) do
-                local sourceIndex = index
-                local info = UIDropDownMenu_CreateInfo()
-                info.text = GetSourceDisplayName(sourceKey)
-                info.checked = copySourceIndex == sourceIndex
-                info.func = function()
-                    copySourceIndex = sourceIndex
-                    RefreshCopyControls()
-                end
-                UIDropDownMenu_AddButton(info, level)
-            end
-        end)
+    local copyApplyButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
+    copyApplyButton:SetSize(224, 26)
+    -- Anchored to the dropdown's own right-edge texture rather than to the page:
+    -- UIDropDownMenuTemplate pads its frame well outside the visible box, so a
+    -- fixed page offset leaves the two controls off by a few pixels vertically.
+    copyApplyButton:SetPoint("LEFT", copyDropdown.frame.Right or copyDropdown.frame, "RIGHT", 6, 0)
+    copyApplyButton:SetText("Copy selected profile")
+
+    RefreshCopyControls = function()
+        local hasSources = #ns.GetOtherCharacterKeys() > 0
+        copyDropdown:SetEnabled(hasSources)
+        copyDropdown:Refresh()
+        copyApplyButton:SetEnabled(hasSources and copySourceKey ~= nil)
     end
     copyApplyButton:SetScript("OnClick", function()
-        if copySourceIndex and ns.CopyProfileToCurrent(copySourceKeys[copySourceIndex]) then
+        if copySourceKey and ns.CopyProfileToCurrent(copySourceKey) then
             ns.ApplyLayout()
             ns.UpdateTracker()
             C_UI.Reload()
         end
     end)
     configPanel.ResetProfileSelection = function()
-        copySourceIndex = nil
+        copySourceKey = nil
         RefreshCopyControls()
     end
     configPanel:SetScript("OnHide", function()
-        CloseDropDownMenus()
         configPanel.ResetProfileSelection()
     end)
     RefreshCopyControls()
@@ -302,6 +294,92 @@ local function BuildStyleTab(configPanel, stylePage)
     end)
     RefreshBorderText()
     Widgets.AddSlider(stylePage, "Border thickness", "borderSize", -108, 1, 8, 1, 10, 468)
+
+    Widgets.AddLabel(stylePage, "Point counter", 10, -152)
+
+    local counterButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
+    counterButton:SetSize(224, 26)
+    counterButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -176)
+    Widgets.AddColorPickerButton(stylePage, "Counter color", function() return ns.db.counterColor end, -176, true, 244, 200)
+
+    local counterFormatButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
+    counterFormatButton:SetSize(224, 26)
+    counterFormatButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -212)
+
+    local hideAtZeroCheck = CreateFrame("CheckButton", nil, stylePage, "UICheckButtonTemplate")
+    hideAtZeroCheck:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 244, -210)
+    hideAtZeroCheck.Text:SetText("Hide counter at 0")
+    hideAtZeroCheck:SetChecked(ns.db.counterHideAtZero)
+
+    local RefreshCounterControls
+    Widgets.AddLabel(stylePage, "Counter font", 10, -246)
+    local outlineCheck = CreateFrame("CheckButton", nil, stylePage, "UICheckButtonTemplate")
+    outlineCheck.Text:SetText("Outline counter")
+    outlineCheck:SetChecked(ns.db.counterOutline)
+    outlineCheck:SetScript("OnClick", function(self)
+        ns.db.counterOutline = self:GetChecked() and true or false
+        ns.ApplyLayout()
+        ns.UpdateTracker()
+    end)
+    local fontPicker = Widgets.AddScrollableDropdown(stylePage, ADDON_NAME .. "CounterFontDropdown", -6, -266, 218, {
+        GetItems = function()
+            local items = {}
+            for _, font in ipairs(ns.GetAvailableFonts()) do
+                table.insert(items, { name = font.name, value = font.path, font = font.path })
+            end
+            return items
+        end,
+        GetValue = function()
+            return ns.db.counterFont
+        end,
+        SetValue = function(fontPath)
+            ns.db.counterFont = fontPath
+            RefreshCounterControls()
+            ns.ApplyLayout()
+            ns.UpdateTracker()
+        end,
+        GetDisplayName = function(fontPath)
+            return ns.GetFontDisplayName(fontPath)
+        end,
+    })
+    -- Anchored to the dropdown's visible right edge for the same reason as the
+    -- Profiles tab's copy button: the template's frame is padded past its box.
+    outlineCheck:SetPoint("LEFT", fontPicker.frame.Right or fontPicker.frame, "RIGHT", 10, 0)
+
+    RefreshCounterControls = function()
+        counterButton:SetText(ns.db.showCounter and "Counter: On" or "Counter: Off")
+        counterFormatButton:SetText(ns.db.counterShowMax and "Counter format: current/max" or "Counter format: current")
+        counterFormatButton:SetEnabled(ns.db.showCounter)
+        hideAtZeroCheck:SetEnabled(ns.db.showCounter)
+        hideAtZeroCheck:SetChecked(ns.db.counterHideAtZero)
+        fontPicker:SetEnabled(ns.db.showCounter)
+        fontPicker:Refresh()
+        outlineCheck:SetEnabled(ns.db.showCounter)
+        outlineCheck:SetChecked(ns.db.counterOutline)
+    end
+
+    counterButton:SetScript("OnClick", function()
+        ns.db.showCounter = not ns.db.showCounter
+        RefreshCounterControls()
+        ns.ApplyLayout()
+        ns.UpdateTracker()
+    end)
+    counterFormatButton:SetScript("OnClick", function()
+        ns.db.counterShowMax = not ns.db.counterShowMax
+        RefreshCounterControls()
+        ns.ApplyLayout()
+        ns.UpdateTracker()
+    end)
+    hideAtZeroCheck:SetScript("OnClick", function(self)
+        ns.db.counterHideAtZero = self:GetChecked() and true or false
+        ns.ApplyLayout()
+        ns.UpdateTracker()
+    end)
+    RefreshCounterControls()
+
+    Widgets.AddSlider(stylePage, "Counter font size", "counterFontSize", -308, 6, 48, 1, 10, 468)
+    Widgets.AddSlider(stylePage, "Counter X offset", "counterOffsetX", -370, -200, 200, 1, 10, 224)
+    Widgets.AddSlider(stylePage, "Counter Y offset", "counterOffsetY", -370, -200, 200, 1, 244, 224)
 end
 
 -- === Attach tab: pick a UI frame to snap to, anchor point, offset sliders ===
@@ -490,6 +568,7 @@ local function BuildPreviewSection(configPanel)
         for index = 1, 5 do
             state.points[index] = ns.CreatePointFrame(preview)
         end
+        state.counter = ns.CreateCounterText(preview)
     end
 
     local function UpdateConfigPreview()
@@ -499,12 +578,19 @@ local function BuildPreviewSection(configPanel)
         local pointHeight = math.min(db.pointHeight, 22)
         local spacing = math.min(db.spacing, 8)
         local totalWidth = (pointWidth * 5) + (spacing * 4)
+        local scale = 1
         if totalWidth > maxWidth then
-            local scale = maxWidth / totalWidth
+            scale = maxWidth / totalWidth
             pointWidth = pointWidth * scale
             pointHeight = pointHeight * scale
             spacing = spacing * scale
+            totalWidth = (pointWidth * 5) + (spacing * 4)
         end
+
+        -- The preview clamps and scales sizes to fit its strip, so the counter
+        -- is scaled the same way rather than drawn at its real font size.
+        local counterFontSize = math.max(6, math.min(db.counterFontSize, 22) * scale)
+        local counterX = 78 + (totalWidth / 2) + (db.counterOffsetX * scale)
 
         local borderInset = db.showBorder and math.min(db.borderSize, math.floor(math.min(pointWidth, pointHeight) / 3)) or 0
         local isRound = db.shape == "round"
@@ -521,6 +607,12 @@ local function BuildPreviewSection(configPanel)
                     point:SetPoint("LEFT", state.points[index - 1], "RIGHT", spacing, 0)
                 end
             end
+
+            ns.StyleCounterText(state.counter, db, counterFontSize)
+            state.counter:SetText(ns.FormatCounterText(db, state.active, 5))
+            state.counter:SetShown(ns.ShouldShowCounter(db, state.active))
+            state.counter:ClearAllPoints()
+            state.counter:SetPoint("CENTER", preview, "LEFT", counterX, state.y + (db.counterOffsetY * scale))
         end
     end
 
@@ -544,8 +636,8 @@ end
 function ns.CreateConfigPanel()
     local configPanel = CreateFrame("Frame", ADDON_NAME .. "Config", UIParent, "BackdropTemplate")
     ns.configPanel = configPanel
-    configPanel:SetSize(520, 610)
-    configPanel:SetResizeBounds(500, 610, 900, 900)
+    configPanel:SetSize(520, 670)
+    configPanel:SetResizeBounds(500, 670, 900, 900)
     configPanel:SetResizable(true)
     local configPosition = ns.db.configPosition
     configPanel:SetPoint(configPosition.point, UIParent, configPosition.relativePoint, configPosition.x, configPosition.y)

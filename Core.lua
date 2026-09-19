@@ -22,6 +22,15 @@ ns.DEFAULTS = {
     showBorder = true,
     borderSize = 1,
     borderColor = { r = 0, g = 0, b = 0, a = 0.5338539481163025 },
+    showCounter = false,
+    counterShowMax = false,
+    counterHideAtZero = false,
+    counterFont = "",
+    counterFontSize = 16,
+    counterOutline = true,
+    counterColor = { r = 1, g = 1, b = 1, a = 1 },
+    counterOffsetX = 0,
+    counterOffsetY = 0,
     position = { point = "CENTER", relativePoint = "CENTER", x = 0, y = -180, frameName = "UIParent" },
     configPosition = { point = "TOPLEFT", relativePoint = "CENTER", x = -260, y = 305 },
     snapToFrame = false,
@@ -43,6 +52,90 @@ ns.classFile = nil
 -- preview (ConfigPanel.lua BuildPreviewSection); a no-op until then so
 -- callers can invoke it unconditionally.
 ns.UpdateConfigPreview = function() end
+
+-- Fonts: "" means the client's standard font. The candidate list covers the
+-- fonts WoW ships (locale builds ship different subsets), and each one is
+-- probed with a throwaway font string before being offered, so a font missing
+-- from this client never reaches the dropdown. Any font another addon has
+-- registered with LibSharedMedia-3.0 is merged in when that library is loaded;
+-- this addon does not embed it.
+
+local FONT_CANDIDATES = {
+    { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
+    { name = "Arial Narrow", path = "Fonts\\ARIALN.TTF" },
+    { name = "Skurri", path = "Fonts\\skurri.ttf" },
+    { name = "Morpheus", path = "Fonts\\MORPHEUS.TTF" },
+    { name = "Nimrod MT", path = "Fonts\\NIM_____.ttf" },
+    { name = "2002", path = "Fonts\\2002.TTF" },
+    { name = "2002 Bold", path = "Fonts\\2002B.TTF" },
+    { name = "Damage", path = "Fonts\\K_Damage.TTF" },
+    { name = "Pagetext", path = "Fonts\\K_Pagetext.TTF" },
+    { name = "AR Kai", path = "Fonts\\ARKai_T.ttf" },
+    { name = "AR Kai Combat", path = "Fonts\\ARKai_C.ttf" },
+    { name = "AR Hei", path = "Fonts\\ARHei.ttf" },
+    { name = "bHEI00M", path = "Fonts\\bHEI00M.ttf" },
+    { name = "bHEI01B", path = "Fonts\\bHEI01B.ttf" },
+    { name = "bKAI00M", path = "Fonts\\bKAI00M.ttf" },
+    { name = "bLEI00D", path = "Fonts\\bLEI00D.ttf" },
+}
+
+function ns.GetDefaultFontPath()
+    return STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+end
+
+-- SetFont's return value is inconsistent across client versions, so success is
+-- confirmed by reading the path back instead.
+function ns.TrySetFont(fontString, path, size, flags)
+    if not path or path == "" then
+        return false
+    end
+    fontString:SetFont(path, size, flags)
+    local applied = fontString:GetFont()
+    return applied ~= nil and applied:lower() == path:lower()
+end
+
+local fontTester
+
+function ns.GetAvailableFonts()
+    fontTester = fontTester or UIParent:CreateFontString(nil, "BACKGROUND", "GameFontNormal")
+
+    local fonts = { { name = "Default", path = "" } }
+    local seen = {}
+    local function AddFont(name, path)
+        if not path or path == "" or seen[path:lower()] then
+            return
+        end
+        if ns.TrySetFont(fontTester, path, 12, "") then
+            seen[path:lower()] = true
+            table.insert(fonts, { name = name, path = path })
+        end
+    end
+
+    for _, candidate in ipairs(FONT_CANDIDATES) do
+        AddFont(candidate.name, candidate.path)
+    end
+
+    local sharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
+    if sharedMedia then
+        for _, name in ipairs(sharedMedia:List("font")) do
+            AddFont(name, sharedMedia:Fetch("font", name, true))
+        end
+    end
+
+    return fonts
+end
+
+function ns.GetFontDisplayName(path)
+    if not path or path == "" then
+        return "Default"
+    end
+    for _, font in ipairs(ns.GetAvailableFonts()) do
+        if font.path == path then
+            return font.name
+        end
+    end
+    return path:match("([^\\/]+)$") or path
+end
 
 function ns.GetAttachmentFrame(frameName)
     return (frameName and _G[frameName]) or UIParent

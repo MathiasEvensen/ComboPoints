@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+- Add an optional point counter in the Style tab: a number over the bar showing how many points are active, capped at the spec's maximum.
+  - Counter format switches between the current count alone and current/max (`2 / 5`).
+  - Counter has its own color, font size, and font: the font dropdown scrolls, previews each row in its own font, and covers the fonts this client ships plus any font another addon registered.
+  - Optional **Hide counter at 0** (off by default) hides the counter while no points are active.
+  - Counter is centred on the bar and follows it; X/Y offsets adjust it relative to that centre.
+- The Profiles tab's source-character dropdown now uses the same scrolling list, and its copy button lines up with it.
+- Settings window is taller to fit the counter options.
+
 ## 1.1.1
 
 - Add profile export/import as pasteable text in the Profiles tab.
