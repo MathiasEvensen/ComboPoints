@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+permissions:
+  # Lets the packager create the GitHub release for the tag.
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -15,3 +19,5 @@ jobs:
         uses: BigWigsMods/packager@v2
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          # Supplied automatically by Actions; nothing to create or store.
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
