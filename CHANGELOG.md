@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- Fix lua error on setfont check
+
 ## 1.2.0
 
 - Add an optional point counter in the Style tab: a number over the bar showing how many points are active, capped at the spec's maximum.

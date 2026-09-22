@@ -94,7 +94,7 @@ local function BuildLayoutTab(configPanel, layoutPage)
     end)
 end
 
--- === Profiles tab: copy another character's settings onto the current one ===
+-- Profiles tab: copy another character's settings onto the current one
 
 local function BuildProfilesTab(configPanel, profilesPage)
     local profilesTitle = profilesPage:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
@@ -227,7 +227,7 @@ local function BuildProfilesTab(configPanel, profilesPage)
     end)
 end
 
--- === Colors tab: static or per-point active colors, and the empty color ===
+-- Colors tab: static or per-point active colors, and the empty color
 
 local function BuildColorsTab(configPanel, colorsPage)
     local colorModeButton = CreateFrame("Button", nil, colorsPage, "UIPanelButtonTemplate")
@@ -261,7 +261,7 @@ local function BuildColorsTab(configPanel, colorsPage)
     RefreshColorMode()
 end
 
--- === Style tab: background/border on-off and colors, border thickness ===
+-- Style tab: background/border on-off and colors, border thickness
 
 local function BuildStyleTab(configPanel, stylePage)
     local backgroundButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
@@ -342,8 +342,7 @@ local function BuildStyleTab(configPanel, stylePage)
             return ns.GetFontDisplayName(fontPath)
         end,
     })
-    -- Anchored to the dropdown's visible right edge for the same reason as the
-    -- Profiles tab's copy button: the template's frame is padded past its box.
+
     outlineCheck:SetPoint("LEFT", fontPicker.frame.Right or fontPicker.frame, "RIGHT", 10, 0)
 
     RefreshCounterControls = function()
@@ -382,7 +381,7 @@ local function BuildStyleTab(configPanel, stylePage)
     Widgets.AddSlider(stylePage, "Counter Y offset", "counterOffsetY", -370, -200, 200, 1, 244, 224)
 end
 
--- === Attach tab: pick a UI frame to snap to, anchor point, offset sliders ===
+-- Attach tab: pick a UI frame to snap to, anchor point, offset sliders
 
 local function BuildAttachTab(configPanel, attachPage)
     local RefreshAttachmentText
@@ -545,7 +544,7 @@ local function BuildAttachTab(configPanel, attachPage)
     RefreshAttachmentText()
 end
 
--- === Live preview strip at the bottom of the panel (full/2-5/empty states) ===
+-- Live preview strip at the bottom of the panel (full/2-5/empty states)
 
 local function BuildPreviewSection(configPanel)
     local preview = CreateFrame("Frame", nil, configPanel, "BackdropTemplate")
@@ -587,8 +586,6 @@ local function BuildPreviewSection(configPanel)
             totalWidth = (pointWidth * 5) + (spacing * 4)
         end
 
-        -- The preview clamps and scales sizes to fit its strip, so the counter
-        -- is scaled the same way rather than drawn at its real font size.
         local counterFontSize = math.max(6, math.min(db.counterFontSize, 22) * scale)
         local counterX = 78 + (totalWidth / 2) + (db.counterOffsetX * scale)
 
@@ -622,7 +619,7 @@ local function BuildPreviewSection(configPanel)
     UpdateConfigPreview()
 end
 
--- === Panel frame itself: chrome, tabs/pages, wires the sections above together ===
+-- Panel frame itself: chrome, tabs/pages, wires the sections above together
 
 function ns.ResetConfigPosition()
     ns.db.configPosition = ns.CopyTable(ns.DEFAULTS.configPosition)

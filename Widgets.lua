@@ -33,8 +33,6 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
     valueInput:SetSize(46, 20)
     valueInput:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y + 2)
     valueInput:SetAutoFocus(false)
-    -- SetNumeric rejects the minus key, so only sliders with a non-negative
-    -- range can use it; negative-capable ones validate via tonumber below.
     valueInput:SetNumeric(minValue >= 0)
     valueInput:SetScript("OnEnterPressed", function(self)
         local value = tonumber(self:GetText())
@@ -180,12 +178,6 @@ function Widgets.AddColorPickerButton(parent, label, getColor, y, applyLayout, x
     return button
 end
 
--- Scrollable dropdown: Blizzard's UIDropDownMenuTemplate chrome (so it reads as
--- a dropdown, not a button) driving a scrolling list of our own instead of a
--- UIDropDownMenu menu, which has no scrolling and runs off the screen once the
--- entry count grows. Config supplies GetItems (each { name, value, font }),
--- GetValue, SetValue, GetDisplayName, and an optional emptyText.
-
 local DROPDOWN_ROW_HEIGHT = 20
 local DROPDOWN_LIST_HEIGHT = 180
 
@@ -224,9 +216,6 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
     content:SetSize(width, DROPDOWN_LIST_HEIGHT - 16)
     scrollFrame:SetScrollChild(content)
 
-    -- Opened upward when the list would otherwise run past the bottom of the
-    -- settings window, which depends on where the window sits and how tall the
-    -- user has dragged it, so it is decided per open rather than per control.
     local function AnchorList()
         local panel = ns.configPanel
         local dropdownBottom = dropdown:GetBottom()
@@ -261,8 +250,6 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
         return row
     end
 
-    -- Rebuilt on every open, so a profile saved or a font registered since the
-    -- panel was built still shows up.
     local function RebuildRows()
         local items = config.GetItems()
         local selected = config.GetValue()
@@ -313,8 +300,6 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
         arrowButton:SetScript("OnClick", Toggle)
     end
 
-    -- The template only makes its arrow clickable; this covers the text box so
-    -- the whole control opens the list, the way a dropdown is expected to.
     local clickCatcher = CreateFrame("Button", nil, dropdown)
     clickCatcher:SetPoint("TOPLEFT", leftRegion, "TOPLEFT", 0, 0)
     clickCatcher:SetPoint("BOTTOMRIGHT", rightRegion, "BOTTOMRIGHT", 0, 0)

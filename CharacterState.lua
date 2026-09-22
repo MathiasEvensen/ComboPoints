@@ -53,8 +53,8 @@ function ns.CopyProfileToCurrent(sourceKey)
     return true
 end
 
--- Export/import: serialize a profile table to a pasteable Lua literal string
--- and back. Deserialization runs the parsed chunk in an empty sandbox
+-- Export/import: serialize a profile table to a pasteable Lua literal string and back.
+-- Deserialization runs the parsed chunk in an empty sandbox
 -- (setfenv to {}) so pasted text can only build a table, never touch globals.
 
 local function SerializeValue(value, parts)

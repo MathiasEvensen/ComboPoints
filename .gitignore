@@ -41,4 +41,5 @@ luac.out
 
 # Internal notes, not for release
 NOTES.md
+.remember/
 
