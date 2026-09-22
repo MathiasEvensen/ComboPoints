@@ -84,14 +84,22 @@ function ns.GetDefaultFontPath()
 end
 
 -- SetFont's return value is inconsistent across client versions, so success is
--- confirmed by reading the path back instead.
+-- confirmed by reading the path back where possible. Newer clients may report
+-- the applied font as a numeric file ID instead of a path, which cannot be
+-- compared to the path string; in that case trust SetFont's boolean result.
 function ns.TrySetFont(fontString, path, size, flags)
     if not path or path == "" then
         return false
     end
-    fontString:SetFont(path, size, flags)
+    local ok = fontString:SetFont(path, size, flags)
     local applied = fontString:GetFont()
-    return applied ~= nil and applied:lower() == path:lower()
+    if type(applied) == "string" then
+        return applied:lower() == path:lower()
+    end
+    if type(ok) == "boolean" then
+        return ok
+    end
+    return applied ~= nil
 end
 
 local fontTester
