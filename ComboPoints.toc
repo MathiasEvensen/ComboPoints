@@ -1,8 +1,8 @@
-## Interface: 120100
+## Interface: 120105
 ## Title: Combo Points
 ## Notes: Customizable tracker for Combo Points and other point-based resources.
 ## Author: iMatMan
-## Version: 1.2.1
+## Version: 1.2.2
 ## X-Curse-Project-ID: 1643324
 ## SavedVariables: ComboPointsDB
 ## IconTexture: Interface\AddOns\ComboPoints\icon.tga

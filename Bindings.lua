@@ -61,6 +61,9 @@ ns.addon:SetScript("OnEvent", function(_, event, unit)
             return
         end
     end
+    if event == "PLAYER_REGEN_DISABLED" and ns.configPanel and ns.configPanel.CancelFramePicker() then
+        print("Combo Points: frame picking cancelled, entering combat.")
+    end
     ns.UpdateTracker()
 end)
 

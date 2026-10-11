@@ -42,4 +42,6 @@ luac.out
 # Internal notes, not for release
 NOTES.md
 .remember/
+research_notes/
+reports/
 

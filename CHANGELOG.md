@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2
+
+- Update for patch 12.1.5 (interface 120105).
+- Fix Lua error when clicking the settings window's resize grip.
+- Frame picking in the Attach tab can no longer be started in combat, and entering combat cancels it, avoiding blocked-action errors.
+- Closing the settings window now cancels frame picking instead of leaving the highlight on screen.
+- Fix keyboard input staying blocked after pressing Enter with no frame under the cursor while picking.
+
 ## 1.2.1
 
 - Fix lua error on setfont check

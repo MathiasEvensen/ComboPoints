@@ -4,3 +4,4 @@ manual-changelog:
 
 ignore:
   - CLAUDE.md
+  - README.md

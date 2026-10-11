@@ -487,13 +487,30 @@ local function BuildAttachTab(configPanel, attachPage)
 
     local function StopFramePicker()
         configPanel.isPickingFrame = false
-        configPanel:SetPropagateKeyboardInput(true)
         pickerHighlight:Hide()
         pickButton:SetText("Pick frame")
     end
+    -- Combat start and panel hide get no OnKeyUp to restore key propagation, so this does it.
+    -- Bindings.lua calls it on PLAYER_REGEN_DISABLED, before lockdown blocks SetPropagateKeyboardInput.
+    -- Returns true if a pick was in progress.
+    configPanel.CancelFramePicker = function()
+        local wasPicking = configPanel.isPickingFrame
+        if wasPicking then
+            StopFramePicker()
+        end
+        if not configPanel:GetPropagateKeyboardInput() then
+            configPanel:SetPropagateKeyboardInput(true)
+        end
+        return wasPicking
+    end
+    configPanel:HookScript("OnHide", configPanel.CancelFramePicker)
 
     pickButton:SetText("Pick frame")
     pickButton:SetScript("OnClick", function()
+        if InCombatLockdown() then
+            print("Combo Points: can't pick a frame in combat.")
+            return
+        end
         configPanel.isPickingFrame = true
         pickButton:SetText("Hover frame, then press Enter (Esc cancels)")
     end)
@@ -539,6 +556,12 @@ local function BuildAttachTab(configPanel, attachPage)
                 RefreshAttachmentText()
                 StopFramePicker()
             end
+        end
+    end)
+    -- OnKeyDown swallows picker keys by turning propagation off; turn it back on once the key is released
+    configPanel:SetScript("OnKeyUp", function(self)
+        if not self:GetPropagateKeyboardInput() then
+            self:SetPropagateKeyboardInput(true)
         end
     end)
     RefreshAttachmentText()
@@ -669,7 +692,7 @@ function ns.CreateConfigPanel()
     resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     resizeGrip:SetScript("OnMouseDown", function()
         configPanel:StartSizing("BOTTOMRIGHT")
-        local focus = GetCurrentKeyboardFocus()
+        local focus = GetCurrentKeyBoardFocus()
         if focus then
             focus:ClearFocus()
         end
