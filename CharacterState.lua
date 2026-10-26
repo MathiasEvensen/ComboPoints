@@ -47,6 +47,7 @@ function ns.CopyProfileToCurrent(sourceKey)
     local db = ns.CopyTable(source)
     db.position = db.position or ns.CopyTable(ns.DEFAULTS.position)
     db.snapToFrame = source.snapToFrame == true
+    db.catFormAllSpecs = source.catFormAllSpecs == true
     ns.db = db
     ComboPointsDB.profiles[ns.currentCharacterKey] = db
     ns.CopyDefaults(ns.DEFAULTS, db)
@@ -109,6 +110,7 @@ function ns.ImportProfile(data)
     local db = ns.CopyTable(data)
     db.position = db.position or ns.CopyTable(ns.DEFAULTS.position)
     db.snapToFrame = data.snapToFrame == true
+    db.catFormAllSpecs = data.catFormAllSpecs == true
     ns.db = db
     ComboPointsDB.profiles[ns.currentCharacterKey] = db
     ns.CopyDefaults(ns.DEFAULTS, db)
@@ -130,7 +132,9 @@ function ns.IsTrackedClass(classFile)
     classFile = classFile or select(2, UnitClass("player"))
     local specializationID = GetSpecializationID()
     if classFile == "DRUID" then
-        return specializationID == 103 and GetShapeshiftFormID() == 1 -- Feral Cat Form
+        -- Second return: in Cat Form on any spec, for the catFormAllSpecs option.
+        local inCatForm = GetShapeshiftFormID() == 1 -- Cat Form
+        return specializationID == 103 and inCatForm, inCatForm -- Feral
     end
     if classFile == "MONK" then
         return specializationID == 269 -- Windwalker

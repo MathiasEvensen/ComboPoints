@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3
+
+- Add **Show in Cat Form for all specs** to the Layout tab (druids only, off by default): shows the combo point tracker in Cat Form on every druid spec, not only Feral. It applies while **Only show usable specs** is on; with that off, the tracker already shows in every spec and form.
+
 ## 1.2.2
 
 - Update for patch 12.1.5 (interface 120105).

@@ -84,12 +84,31 @@ local function BuildLayoutTab(configPanel, layoutPage)
         ns.UpdateTracker()
     end)
 
+    -- Non-Feral druids still build combo points in Cat Form (cat-weaving), but
+    -- many only shift for travel speed, so this stays opt-in. It only narrows
+    -- the usable-specs filter, so it is disabled while that filter is off.
+    local catFormCheck
+    if ns.classFile == "DRUID" then
+        catFormCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
+        catFormCheck:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -390)
+        catFormCheck.Text:SetText("Show in Cat Form for all specs")
+        catFormCheck:SetChecked(ns.db.catFormAllSpecs)
+        catFormCheck:SetEnabled(ns.db.onlySupportedSpecs)
+        catFormCheck:SetScript("OnClick", function(self)
+            ns.db.catFormAllSpecs = self:GetChecked() and true or false
+            ns.UpdateTracker()
+        end)
+    end
+
     local supportedSpecsCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
     supportedSpecsCheck:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -358)
     supportedSpecsCheck.Text:SetText("Only show usable specs")
     supportedSpecsCheck:SetChecked(ns.db.onlySupportedSpecs)
     supportedSpecsCheck:SetScript("OnClick", function(self)
         ns.db.onlySupportedSpecs = self:GetChecked() and true or false
+        if catFormCheck then
+            catFormCheck:SetEnabled(ns.db.onlySupportedSpecs)
+        end
         ns.UpdateTracker()
     end)
 end

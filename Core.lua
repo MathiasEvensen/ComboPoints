@@ -36,6 +36,7 @@ ns.DEFAULTS = {
     snapToFrame = false,
     onlyInCombat = false,
     onlySupportedSpecs = true,
+    catFormAllSpecs = false,
     enabled = true,
 }
 
