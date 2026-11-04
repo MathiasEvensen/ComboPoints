@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.4
+
+- Fix the settings window growing on the first click of its resize grip, before you drag.
+- Resizing the settings window no longer redraws the preview on every frame of the drag.
+
 ## 1.2.3
 
 - Add **Show in Cat Form for all specs** to the Layout tab (druids only, off by default): shows the combo point tracker in Cat Form on every druid spec, not only Feral. It applies while **Only show usable specs** is on; with that off, the tracker already shows in every spec and form.

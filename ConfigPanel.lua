@@ -612,14 +612,21 @@ local function BuildPreviewSection(configPanel)
         state.counter = ns.CreateCounterText(preview)
     end
 
+    -- Room for the points next to the labels, and the width of the points at full size.
+    local function PreviewWidths(db)
+        local fullWidth = (math.min(db.pointWidth, 32) * 5) + (math.min(db.spacing, 8) * 4)
+        return preview:GetWidth() - 88, fullWidth
+    end
+
+    local previewScaled = false
     local function UpdateConfigPreview()
         local db = ns.db
-        local maxWidth = preview:GetWidth() - 88
+        local maxWidth, totalWidth = PreviewWidths(db)
         local pointWidth = math.min(db.pointWidth, 32)
         local pointHeight = math.min(db.pointHeight, 22)
         local spacing = math.min(db.spacing, 8)
-        local totalWidth = (pointWidth * 5) + (spacing * 4)
         local scale = 1
+        previewScaled = totalWidth > maxWidth
         if totalWidth > maxWidth then
             scale = maxWidth / totalWidth
             pointWidth = pointWidth * scale
@@ -656,8 +663,16 @@ local function BuildPreviewSection(configPanel)
     end
 
     ns.UpdateConfigPreview = UpdateConfigPreview
-    preview:SetScript("OnSizeChanged", UpdateConfigPreview)
-    configPanel:SetScript("OnSizeChanged", UpdateConfigPreview)
+    -- OnSizeChanged fires every frame while the window is resized. The preview's layout only
+    -- depends on its width while that is too narrow for the points (they scale down), so it
+    -- is redrawn only then, and once more when it stops being too narrow. The preview spans
+    -- the window, so this also covers the window's own size changes.
+    preview:SetScript("OnSizeChanged", function()
+        local maxWidth, totalWidth = PreviewWidths(ns.db)
+        if previewScaled or totalWidth > maxWidth then
+            UpdateConfigPreview()
+        end
+    end)
     UpdateConfigPreview()
 end
 
@@ -710,7 +725,7 @@ function ns.CreateConfigPanel()
     resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     resizeGrip:SetScript("OnMouseDown", function()
-        configPanel:StartSizing("BOTTOMRIGHT")
+        configPanel:StartSizing("BOTTOMRIGHT", true)
         local focus = GetCurrentKeyBoardFocus()
         if focus then
             focus:ClearFocus()
