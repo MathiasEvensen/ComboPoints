@@ -4,6 +4,8 @@
 
 - Fix the settings window growing on the first click of its resize grip, before you drag.
 - Resizing the settings window no longer redraws the preview on every frame of the drag.
+- The settings window's controls now stretch with its width instead of leaving empty space when you resize it.
+- The settings window's size is saved per character with its position, the window stays on screen, and `/cop resetconfigpos` resets both.
 
 ## 1.2.3
 

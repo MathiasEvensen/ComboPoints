@@ -33,6 +33,7 @@ ns.DEFAULTS = {
     counterOffsetY = 0,
     position = { point = "CENTER", relativePoint = "CENTER", x = 0, y = -180, frameName = "UIParent" },
     configPosition = { point = "TOPLEFT", relativePoint = "CENTER", x = -260, y = 305 },
+    configSize = { width = 520, height = 670 },
     snapToFrame = false,
     onlyInCombat = false,
     onlySupportedSpecs = true,

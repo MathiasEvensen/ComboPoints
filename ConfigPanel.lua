@@ -15,13 +15,13 @@ local function BuildLayoutTab(configPanel, layoutPage)
         ns.UpdateTracker()
     end)
 
-    Widgets.AddSlider(layoutPage, "Point width", "pointWidth", -48, 8, 100, 1, 10, 468)
-    Widgets.AddSlider(layoutPage, "Point height", "pointHeight", -116, 8, 100, 1, 10, 468)
-    Widgets.AddSlider(layoutPage, "Spacing", "spacing", -184, 0, 50, 1, 10, 468)
+    Widgets.AddSlider(layoutPage, "Point width", "pointWidth", -48, 8, 100, 1)
+    Widgets.AddSlider(layoutPage, "Point height", "pointHeight", -116, 8, 100, 1)
+    Widgets.AddSlider(layoutPage, "Spacing", "spacing", -184, 0, 50, 1)
 
     local shapeButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
-    shapeButton:SetSize(224, 26)
-    shapeButton:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -260)
+    shapeButton:SetHeight(26)
+    Widgets.PlaceInColumn(shapeButton, layoutPage, "left", -260)
     local function RefreshShapeText()
         shapeButton:SetText("Shape: " .. (ns.db.shape == "round" and "Round" or "Square"))
     end
@@ -34,11 +34,10 @@ local function BuildLayoutTab(configPanel, layoutPage)
     RefreshShapeText()
 
     local unlockButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
-    unlockButton:SetSize(224, 26)
-    unlockButton:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 244, -260)
+    unlockButton:SetHeight(26)
+    Widgets.PlaceInColumn(unlockButton, layoutPage, "right", -260)
     local detachHint = layoutPage:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    detachHint:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 244, -290)
-    detachHint:SetWidth(224)
+    Widgets.PlaceInColumn(detachHint, layoutPage, "right", -290)
     detachHint:SetJustifyH("CENTER")
     detachHint:SetText("Attached to a frame. Open Attach, then choose Detach to screen to free-move.")
     configPanel.RefreshUnlockText = function()
@@ -58,8 +57,8 @@ local function BuildLayoutTab(configPanel, layoutPage)
     configPanel.RefreshUnlockText()
 
     local resetPositionButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
-    resetPositionButton:SetSize(224, 26)
-    resetPositionButton:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 10, -322)
+    resetPositionButton:SetHeight(26)
+    Widgets.PlaceInColumn(resetPositionButton, layoutPage, "left", -322)
     resetPositionButton:SetText("Reset position")
     resetPositionButton:SetScript("OnClick", function()
         ns.ResetPosition()
@@ -67,8 +66,8 @@ local function BuildLayoutTab(configPanel, layoutPage)
     end)
 
     local resetButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
-    resetButton:SetSize(224, 26)
-    resetButton:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 244, -322)
+    resetButton:SetHeight(26)
+    Widgets.PlaceInColumn(resetButton, layoutPage, "right", -322)
     resetButton:SetText("Reset all defaults")
     resetButton:SetScript("OnClick", function()
         ns.ResetCurrentProfile()
@@ -76,7 +75,7 @@ local function BuildLayoutTab(configPanel, layoutPage)
     end)
 
     local combatOnlyCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
-    combatOnlyCheck:SetPoint("TOPLEFT", layoutPage, "TOPLEFT", 244, -358)
+    combatOnlyCheck:SetPoint("TOPLEFT", layoutPage, "TOP", 0, -358)
     combatOnlyCheck.Text:SetText("Only show in combat")
     combatOnlyCheck:SetChecked(ns.db.onlyInCombat)
     combatOnlyCheck:SetScript("OnClick", function(self)
@@ -188,13 +187,13 @@ local function BuildProfilesTab(configPanel, profilesPage)
 
     local statusText = profilesPage:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     statusText:SetPoint("TOPLEFT", exportImportTitle, "BOTTOMLEFT", 0, -6)
-    statusText:SetWidth(478)
     statusText:SetJustifyH("LEFT")
     statusText:SetText("Export copies current profile as text below. Paste text below, then Import to replace current profile.")
 
     local editBoxBg = CreateFrame("Frame", nil, profilesPage, "BackdropTemplate")
     editBoxBg:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 10, -228)
-    editBoxBg:SetSize(478, 90)
+    editBoxBg:SetPoint("TOPRIGHT", profilesPage, "TOPRIGHT", 0, -228)
+    editBoxBg:SetHeight(90)
     editBoxBg:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     editBoxBg:SetBackdropColor(0, 0, 0, 0.6)
     editBoxBg:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
@@ -208,7 +207,6 @@ local function BuildProfilesTab(configPanel, profilesPage)
     editBox:SetFontObject(ChatFontNormal)
     editBox:SetAutoFocus(false)
     editBox:SetMaxLetters(0)
-    editBox:SetWidth(442)
     editBox:SetScript("OnEscapePressed", function(self)
         self:ClearFocus()
     end)
@@ -220,8 +218,8 @@ local function BuildProfilesTab(configPanel, profilesPage)
     scrollFrame:SetScrollChild(editBox)
 
     local exportButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
-    exportButton:SetSize(224, 26)
-    exportButton:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 10, -328)
+    exportButton:SetHeight(26)
+    Widgets.PlaceInColumn(exportButton, profilesPage, "left", -328)
     exportButton:SetText("Export current profile")
     exportButton:SetScript("OnClick", function()
         editBox:SetText(ns.SerializeProfile(ns.db))
@@ -231,8 +229,8 @@ local function BuildProfilesTab(configPanel, profilesPage)
     end)
 
     local importButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
-    importButton:SetSize(224, 26)
-    importButton:SetPoint("TOPLEFT", profilesPage, "TOPLEFT", 244, -328)
+    importButton:SetHeight(26)
+    Widgets.PlaceInColumn(importButton, profilesPage, "right", -328)
     importButton:SetText("Import profile from text")
     importButton:SetScript("OnClick", function()
         local data = ns.DeserializeProfile(editBox:GetText())
@@ -244,22 +242,29 @@ local function BuildProfilesTab(configPanel, profilesPage)
             statusText:SetText("Import failed: pasted text is not a valid profile string.")
         end
     end)
+
+    table.insert(configPanel.widthReflows, function(extraWidth)
+        copyDropdown:SetWidth(218 + extraWidth / 2)
+        copyApplyButton:SetWidth(224 + extraWidth / 2)
+        statusText:SetWidth(478 + extraWidth)
+        editBox:SetWidth(442 + extraWidth)
+    end)
 end
 
 -- Colors tab: static or per-point active colors, and the empty color
 
 local function BuildColorsTab(configPanel, colorsPage)
     local colorModeButton = CreateFrame("Button", nil, colorsPage, "UIPanelButtonTemplate")
-    colorModeButton:SetSize(468, 26)
-    colorModeButton:SetPoint("TOPLEFT", colorsPage, "TOPLEFT", 10, -14)
-    local staticColorButton = Widgets.AddColorPickerButton(colorsPage, "Static active color", function() return ns.db.color end, -50, false, 10, 200)
-    Widgets.AddColorPickerButton(colorsPage, "Empty color", function() return ns.db.emptyColor end, -50, false, 244, 200)
+    colorModeButton:SetHeight(26)
+    Widgets.PlaceInColumn(colorModeButton, colorsPage, "full", -14)
+    local staticColorButton = Widgets.AddColorPickerButton(colorsPage, "Static active color", function() return ns.db.color end, -50, false, "left")
+    Widgets.AddColorPickerButton(colorsPage, "Empty color", function() return ns.db.emptyColor end, -50, false, "right")
     local individualColorLabel = Widgets.AddLabel(colorsPage, "Individual active-point colors", 10, -92)
     local individualColorButtons = {}
     for index = 1, 5 do
-        local column = (index - 1) % 2
+        local column = (index - 1) % 2 == 0 and "left" or "right"
         local row = math.floor((index - 1) / 2)
-        individualColorButtons[index] = Widgets.AddColorPickerButton(colorsPage, "Point " .. index .. " color", function() return ns.db.pointColors[index] end, -116 - (row * 34), false, 10 + (column * 234), 200)
+        individualColorButtons[index] = Widgets.AddColorPickerButton(colorsPage, "Point " .. index .. " color", function() return ns.db.pointColors[index] end, -116 - (row * 34), false, column)
     end
     local function RefreshColorMode()
         colorModeButton:SetText(ns.db.useIndividualColors and "Color mode: Individual" or "Color mode: One static color")
@@ -284,9 +289,9 @@ end
 
 local function BuildStyleTab(configPanel, stylePage)
     local backgroundButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
-    backgroundButton:SetSize(224, 26)
-    backgroundButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -14)
-    Widgets.AddColorPickerButton(stylePage, "Box background color", function() return ns.db.backgroundColor end, -14, true, 244, 200)
+    backgroundButton:SetHeight(26)
+    Widgets.PlaceInColumn(backgroundButton, stylePage, "left", -14)
+    Widgets.AddColorPickerButton(stylePage, "Box background color", function() return ns.db.backgroundColor end, -14, true, "right")
     local function RefreshBackgroundText()
         backgroundButton:SetText(ns.db.showBackground and "Box background: On" or "Box background: Off")
     end
@@ -299,9 +304,9 @@ local function BuildStyleTab(configPanel, stylePage)
     RefreshBackgroundText()
 
     local borderButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
-    borderButton:SetSize(224, 26)
-    borderButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -50)
-    Widgets.AddColorPickerButton(stylePage, "Border color", function() return ns.db.borderColor end, -50, true, 244, 200)
+    borderButton:SetHeight(26)
+    Widgets.PlaceInColumn(borderButton, stylePage, "left", -50)
+    Widgets.AddColorPickerButton(stylePage, "Border color", function() return ns.db.borderColor end, -50, true, "right")
     local function RefreshBorderText()
         borderButton:SetText(ns.db.showBorder and "Border: On" or "Border: Off")
     end
@@ -312,21 +317,21 @@ local function BuildStyleTab(configPanel, stylePage)
         ns.UpdateTracker()
     end)
     RefreshBorderText()
-    Widgets.AddSlider(stylePage, "Border thickness", "borderSize", -108, 1, 8, 1, 10, 468)
+    Widgets.AddSlider(stylePage, "Border thickness", "borderSize", -108, 1, 8, 1)
 
     Widgets.AddLabel(stylePage, "Point counter", 10, -152)
 
     local counterButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
-    counterButton:SetSize(224, 26)
-    counterButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -176)
-    Widgets.AddColorPickerButton(stylePage, "Counter color", function() return ns.db.counterColor end, -176, true, 244, 200)
+    counterButton:SetHeight(26)
+    Widgets.PlaceInColumn(counterButton, stylePage, "left", -176)
+    Widgets.AddColorPickerButton(stylePage, "Counter color", function() return ns.db.counterColor end, -176, true, "right")
 
     local counterFormatButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
-    counterFormatButton:SetSize(224, 26)
-    counterFormatButton:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 10, -212)
+    counterFormatButton:SetHeight(26)
+    Widgets.PlaceInColumn(counterFormatButton, stylePage, "left", -212)
 
     local hideAtZeroCheck = CreateFrame("CheckButton", nil, stylePage, "UICheckButtonTemplate")
-    hideAtZeroCheck:SetPoint("TOPLEFT", stylePage, "TOPLEFT", 244, -210)
+    hideAtZeroCheck:SetPoint("TOPLEFT", stylePage, "TOP", 0, -210)
     hideAtZeroCheck.Text:SetText("Hide counter at 0")
     hideAtZeroCheck:SetChecked(ns.db.counterHideAtZero)
 
@@ -395,9 +400,13 @@ local function BuildStyleTab(configPanel, stylePage)
     end)
     RefreshCounterControls()
 
-    Widgets.AddSlider(stylePage, "Counter font size", "counterFontSize", -308, 6, 48, 1, 10, 468)
-    Widgets.AddSlider(stylePage, "Counter X offset", "counterOffsetX", -370, -200, 200, 1, 10, 224)
-    Widgets.AddSlider(stylePage, "Counter Y offset", "counterOffsetY", -370, -200, 200, 1, 244, 224)
+    Widgets.AddSlider(stylePage, "Counter font size", "counterFontSize", -308, 6, 48, 1)
+    Widgets.AddSlider(stylePage, "Counter X offset", "counterOffsetX", -370, -200, 200, 1, "left")
+    Widgets.AddSlider(stylePage, "Counter Y offset", "counterOffsetY", -370, -200, 200, 1, "right")
+
+    table.insert(configPanel.widthReflows, function(extraWidth)
+        fontPicker:SetWidth(218 + extraWidth / 2)
+    end)
 end
 
 -- Attach tab: pick a UI frame to snap to, anchor point, offset sliders
@@ -410,11 +419,11 @@ local function BuildAttachTab(configPanel, attachPage)
     attachHelp:SetTextColor(1, 0.82, 0, 1)
     local selectedFrameLabel = Widgets.AddLabel(attachPage, "", 10, -48)
     local pickButton = CreateFrame("Button", nil, attachPage, "UIPanelButtonTemplate")
-    pickButton:SetSize(468, 30)
-    pickButton:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 10, -78)
+    pickButton:SetHeight(30)
+    Widgets.PlaceInColumn(pickButton, attachPage, "full", -78)
     local detachButton = CreateFrame("Button", nil, attachPage, "UIPanelButtonTemplate")
-    detachButton:SetSize(224, 26)
-    detachButton:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 10, -120)
+    detachButton:SetHeight(26)
+    Widgets.PlaceInColumn(detachButton, attachPage, "left", -120)
     detachButton:SetText("Detach to screen")
     detachButton:SetScript("OnClick", function()
         ns.db.snapToFrame = false
@@ -425,8 +434,8 @@ local function BuildAttachTab(configPanel, attachPage)
         RefreshAttachmentText()
     end)
     local attachResetPositionButton = CreateFrame("Button", nil, attachPage, "UIPanelButtonTemplate")
-    attachResetPositionButton:SetSize(224, 26)
-    attachResetPositionButton:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 244, -120)
+    attachResetPositionButton:SetHeight(26)
+    Widgets.PlaceInColumn(attachResetPositionButton, attachPage, "right", -120)
     attachResetPositionButton:SetText("Reset position")
     attachResetPositionButton:SetScript("OnClick", function()
         ns.ResetPosition()
@@ -455,11 +464,8 @@ local function BuildAttachTab(configPanel, attachPage)
         end
     end
     for index, option in ipairs(anchorOptions) do
-        local column = (index - 1) % 3
-        local row = math.floor((index - 1) / 3)
         local button = CreateFrame("Button", nil, attachPage, "UIPanelButtonTemplate")
-        button:SetSize(150, 24)
-        button:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 10 + (column * 156), -188 - (row * 30))
+        button:SetHeight(24)
         button:SetText(option.label)
         button:SetScript("OnClick", function()
             ns.db.position.point = option.point
@@ -471,10 +477,19 @@ local function BuildAttachTab(configPanel, attachPage)
         anchorButtons[index] = button
     end
     RefreshAnchorButtons()
+    table.insert(configPanel.widthReflows, function(extraWidth)
+        local buttonWidth = 150 + extraWidth / 3
+        for index, button in ipairs(anchorButtons) do
+            local column = (index - 1) % 3
+            local row = math.floor((index - 1) / 3)
+            button:SetWidth(buttonWidth)
+            button:SetPoint("TOPLEFT", attachPage, "TOPLEFT", 10 + (column * (buttonWidth + 6)), -188 - (row * 30))
+        end
+    end)
 
     Widgets.AddLabel(attachPage, "Frame-relative offset", 10, -286)
-    local xOffsetSlider = Widgets.AddPositionSlider(attachPage, "X offset", "x", -310, 10, 224)
-    local yOffsetSlider = Widgets.AddPositionSlider(attachPage, "Y offset", "y", -310, 244, 224)
+    local xOffsetSlider = Widgets.AddPositionSlider(attachPage, "X offset", "x", -310, "left")
+    local yOffsetSlider = Widgets.AddPositionSlider(attachPage, "Y offset", "y", -310, "right")
     RefreshOffsetControls = function()
         xOffsetSlider:RefreshPosition()
         yOffsetSlider:RefreshPosition()
@@ -678,34 +693,50 @@ end
 
 -- Panel frame itself: chrome, tabs/pages, wires the sections above together
 
+local DEFAULT_WIDTH, DEFAULT_HEIGHT = 520, 670
+local MIN_WIDTH, MIN_HEIGHT = 500, 670
+local MAX_WIDTH, MAX_HEIGHT = 900, 900
+
+local function ApplyConfigGeometry()
+    local size = ns.db.configSize
+    local width = math.min(MAX_WIDTH, math.max(MIN_WIDTH, tonumber(size.width) or DEFAULT_WIDTH))
+    local height = math.min(MAX_HEIGHT, math.max(MIN_HEIGHT, tonumber(size.height) or DEFAULT_HEIGHT))
+    local position = ns.db.configPosition
+    ns.configPanel:SetSize(width, height)
+    ns.configPanel:ClearAllPoints()
+    ns.configPanel:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
+end
+
 function ns.ResetConfigPosition()
     ns.db.configPosition = ns.CopyTable(ns.DEFAULTS.configPosition)
+    ns.db.configSize = ns.CopyTable(ns.DEFAULTS.configSize)
     if ns.configPanel then
-        local position = ns.db.configPosition
-        ns.configPanel:ClearAllPoints()
-        ns.configPanel:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
+        ApplyConfigGeometry()
     end
 end
 
 function ns.CreateConfigPanel()
     local configPanel = CreateFrame("Frame", ADDON_NAME .. "Config", UIParent, "BackdropTemplate")
     ns.configPanel = configPanel
-    configPanel:SetSize(520, 670)
-    configPanel:SetResizeBounds(500, 670, 900, 900)
+    configPanel.widthReflows = {}
+    configPanel:SetResizeBounds(MIN_WIDTH, MIN_HEIGHT, MAX_WIDTH, MAX_HEIGHT)
     configPanel:SetResizable(true)
-    local configPosition = ns.db.configPosition
-    configPanel:SetPoint(configPosition.point, UIParent, configPosition.relativePoint, configPosition.x, configPosition.y)
+    configPanel:SetClampedToScreen(true)
+    ApplyConfigGeometry()
     configPanel:SetMovable(true)
     configPanel:EnableMouse(true)
     configPanel:RegisterForDrag("LeftButton")
     configPanel:SetScript("OnDragStart", configPanel.StartMoving)
-    local function SaveConfigPosition()
+    local function SaveConfigGeometry()
+        -- WoW's layout cache would otherwise restore its own copy of the position at login.
+        configPanel:SetUserPlaced(false)
         local point, _, relativePoint, x, y = configPanel:GetPoint()
         ns.db.configPosition = { point = point, relativePoint = relativePoint, x = math.floor(x + 0.5), y = math.floor(y + 0.5) }
+        ns.db.configSize = { width = math.floor(configPanel:GetWidth() + 0.5), height = math.floor(configPanel:GetHeight() + 0.5) }
     end
     configPanel:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        SaveConfigPosition()
+        SaveConfigGeometry()
     end)
     configPanel:SetFrameStrata("DIALOG")
     configPanel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
@@ -733,6 +764,7 @@ function ns.CreateConfigPanel()
     end)
     resizeGrip:SetScript("OnMouseUp", function()
         configPanel:StopMovingOrSizing()
+        SaveConfigGeometry()
     end)
 
     local pages = {}
@@ -779,5 +811,19 @@ function ns.CreateConfigPanel()
     CreateTab("attach", "Attach", 304, 92)
     CreateTab("profiles", "Profiles", 400, 92)
     ShowPage("layout")
+
+    local reflowedWidth
+    local function ReflowWidth()
+        local width = math.floor(configPanel:GetWidth() + 0.5)
+        if width == reflowedWidth then
+            return
+        end
+        reflowedWidth = width
+        for _, reflow in ipairs(configPanel.widthReflows) do
+            reflow(width - DEFAULT_WIDTH)
+        end
+    end
+    configPanel:SetScript("OnSizeChanged", ReflowWidth)
+    ReflowWidth()
     configPanel:Hide()
 end

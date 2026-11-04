@@ -10,28 +10,38 @@ function Widgets.AddLabel(parent, text, x, y)
     return label
 end
 
-local function CreateBareSlider(parent, x, y, width, minValue, maxValue, step)
+local COLUMN_EDGES = {
+    full = { "TOPLEFT", 10, "TOPRIGHT", -10 },
+    left = { "TOPLEFT", 10, "TOP", -10 },
+    right = { "TOP", 0, "TOPRIGHT", -20 },
+}
+
+function Widgets.PlaceInColumn(region, parent, column, y, rightInset)
+    local edges = COLUMN_EDGES[column]
+    region:SetPoint("TOPLEFT", parent, edges[1], edges[2], y)
+    region:SetPoint("TOPRIGHT", parent, edges[3], edges[4] - (rightInset or 0), y)
+end
+
+local function CreateBareSlider(parent, label, column, y, minValue, maxValue, step)
     local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - 18)
-    slider:SetWidth(width)
+    Widgets.PlaceInColumn(slider, parent, column, y - 18)
     slider:SetMinMaxValues(minValue, maxValue)
     slider:SetValueStep(step)
     slider:SetObeyStepOnDrag(true)
     slider.Low:SetText("")
     slider.High:SetText("")
     slider.Text:SetText("")
+    local labelText = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    labelText:SetPoint("TOPLEFT", slider, "TOPLEFT", 0, 18)
+    labelText:SetText(label)
     return slider
 end
 
-function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, width)
-    x = x or 18
-    width = width or (parent:GetWidth() - 36)
-    Widgets.AddLabel(parent, label, x, y)
-
-    local slider
+function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, column)
+    local slider = CreateBareSlider(parent, label, column or "full", y, minValue, maxValue, step)
     local valueInput = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     valueInput:SetSize(46, 20)
-    valueInput:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y + 2)
+    valueInput:SetPoint("TOPRIGHT", slider, "TOPRIGHT", 0, 20)
     valueInput:SetAutoFocus(false)
     valueInput:SetNumeric(minValue >= 0)
     valueInput:SetScript("OnEnterPressed", function(self)
@@ -48,7 +58,6 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
         self:ClearFocus()
     end)
 
-    slider = CreateBareSlider(parent, x, y, width, minValue, maxValue, step)
     slider:SetValue(ns.db[key])
 
     slider:SetScript("OnValueChanged", function(_, value)
@@ -62,16 +71,13 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, x, w
     return slider
 end
 
-function Widgets.AddPositionSlider(parent, label, key, y, x, width)
-    Widgets.AddLabel(parent, label, x, y)
-
+function Widgets.AddPositionSlider(parent, label, key, y, column)
+    local slider = CreateBareSlider(parent, label, column, y, -500, 500, 1)
     local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     input:SetSize(54, 22)
-    input:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y + 4)
+    input:SetPoint("TOPRIGHT", slider, "TOPRIGHT", 0, 22)
     input:SetAutoFocus(false)
     input:SetText(string.format("%d", ns.db.position[key]))
-
-    local slider = CreateBareSlider(parent, x, y, width, -500, 500, 1)
     slider:SetValue(ns.db.position[key])
 
     local function SetPosition(value)
@@ -106,15 +112,10 @@ function Widgets.AddPositionSlider(parent, label, key, y, x, width)
     return slider
 end
 
-function Widgets.AddColorPickerButton(parent, label, getColor, y, applyLayout, x, width)
+function Widgets.AddColorPickerButton(parent, label, getColor, y, applyLayout, column)
     local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    width = width or 180
-    button:SetSize(width, 26)
-    if x then
-        button:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    else
-        button:SetPoint("TOP", parent, "TOP", 0, y)
-    end
+    button:SetHeight(26)
+    Widgets.PlaceInColumn(button, parent, column, y, 24)
     button:SetText(label)
 
     local preview = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -310,6 +311,9 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
     end)
 
     local picker = { frame = dropdown, list = list }
+    function picker:SetWidth(newWidth)
+        UIDropDownMenu_SetWidth(dropdown, newWidth)
+    end
     function picker:Refresh()
         UIDropDownMenu_SetText(dropdown, config.GetDisplayName(config.GetValue()))
         if list:IsShown() then

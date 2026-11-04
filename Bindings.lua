@@ -25,7 +25,7 @@ SlashCmdList.COMBOPOINTS = function(message)
         print("Combo Points: position reset.")
     elseif message == "resetconfigpos" or message == "resetconfigposition" then
         ns.ResetConfigPosition()
-        print("Combo Points: settings window position reset.")
+        print("Combo Points: settings window position and size reset.")
     elseif message == "reset" then
         ns.ResetCurrentProfile()
         print("Combo Points: defaults restored.")
