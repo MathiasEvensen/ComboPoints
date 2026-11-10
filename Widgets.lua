@@ -37,13 +37,9 @@ local function CreateBareSlider(parent, label, column, y, minValue, maxValue, st
     return slider
 end
 
--- Gap between the bottom of a value box and the top of its slider. The
--- slider's thumb is taller than the slider itself, so a box sitting directly
--- on the slider made a click on the box grab the thumb instead.
+-- The slider's thumb is taller than the slider, so a box sitting directly on it made clicks grab the thumb.
 local VALUE_BOX_GAP = 8
 
--- The "-", number box, "+" row above the right end of a slider: the buttons
--- step by one, the box takes an exact value. Shared by every slider.
 local function CreateStepControls(parent, slider)
     local plusButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     plusButton:SetSize(22, 22)
@@ -64,8 +60,6 @@ local function CreateStepControls(parent, slider)
     return minusButton, input, plusButton
 end
 
--- The range comes from ns.NUMBER_LIMITS (Core.lua), which profile validation
--- also uses, so a slider and the saved value can never disagree.
 function Widgets.AddSlider(parent, label, key, y, step, column)
     local minValue, maxValue = unpack(ns.NUMBER_LIMITS[key])
     local slider = CreateBareSlider(parent, label, column or "full", y, minValue, maxValue, step)
@@ -90,7 +84,6 @@ function Widgets.AddSlider(parent, label, key, y, step, column)
         Sync()
         self:ClearFocus()
     end)
-    -- The slider clamps to its own range and OnValueChanged stores the value.
     minusButton:SetScript("OnClick", function()
         slider:SetValue(ns.db[key] - step)
     end)
@@ -113,17 +106,13 @@ end
 
 local POSITION_SLIDER_RANGE = 500
 
--- Offset control for ns.db.position.x / .y: a slider for coarse moves, -/+
--- buttons for single steps, and a box for exact values. The slider only spans
--- +-POSITION_SLIDER_RANGE so dragging it stays precise; the box and buttons
--- accept anything on screen, and the slider then just rests at its end.
+-- The slider spans only +-POSITION_SLIDER_RANGE so dragging stays precise; the box and buttons accept anything on screen.
 function Widgets.AddPositionSlider(parent, label, key, y, column)
     local slider = CreateBareSlider(parent, label, column, y, -POSITION_SLIDER_RANGE, POSITION_SLIDER_RANGE, 1)
 
     local minusButton, input, plusButton = CreateStepControls(parent, slider)
 
-    -- Shows the stored value. The slider is clamped to its own range, and the
-    -- flag stops that clamped value from being written back as the position.
+    -- The flag stops the slider's clamped value from being written back as the position.
     local syncing = false
     local function Sync()
         local value = ns.db.position[key]
@@ -244,13 +233,9 @@ local DROPDOWN_LIST_HEIGHT = 180
 
 local DROPDOWN_HEIGHT = 26
 
--- The closed dropdown is an addon-owned button rather than Blizzard's
--- UIDropDownMenuTemplate, which has been deprecated since 11.0.
--- The dropdown list that is open, if any, so Esc can close it before the
--- settings window (ConfigPanel.lua OnKeyDown).
+-- Tracked so Esc can close it before the settings window.
 local openDropdownList
 
--- Returns true if a list was open.
 function Widgets.CloseOpenDropdown()
     if openDropdownList then
         openDropdownList:Hide()

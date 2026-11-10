@@ -1,9 +1,5 @@
 local ADDON_NAME, ns = ...
 
--- How many points the character currently has, as the game reports it
--- (UnitPowerMax): 4 for an Arcane Mage, 5 for most, 6 or 7 for a rogue with
--- Deeper Stratagem / Secret Stratagem. Talents are never inspected directly.
--- Falls back to 5 while there is no tracked resource or no maximum yet.
 function ns.GetMaxPoints()
     local maximum = ns.activePowerType and UnitPowerMax("player", ns.activePowerType) or 0
     if not maximum or maximum < 1 then
@@ -12,7 +8,6 @@ function ns.GetMaxPoints()
     return math.min(maximum, math.max(#ns.pointFrames, 1))
 end
 
--- Individual mode: a point beyond the configured colors reuses the last one.
 local function GetActiveColor(db, index)
     if not db.useIndividualColors then
         return db.color
@@ -27,24 +22,9 @@ local function SetPointVisual(point, active, index)
 end
 ns.SetPointVisual = SetPointVisual
 
--- Shared by the live tracker (CreateTracker/ApplyLayout) and the config
--- panel's live preview (ConfigPanel.lua BuildPreviewSection), so both stay visually in sync.
-
--- Background/border are plain color textures layered under the active/empty
--- color texture, rather than a backdrop: SetBackdrop's edgeFile/bgFile are
--- drawn outside the normal texture pipeline, so a mask added to point.texture
--- alone can't round them off - the box stayed square behind a round dot.
---
--- Square mode uses 4 edge strips (picture-frame style) so border color never
--- sits under the interior fill. Round mode instead reuses one of those
--- strips as a single full-size disc masked to a true circle (borderTopTexture
--- doubles as this; the other three stay hidden) - a proper round outline
--- needs a genuine circle, which a border-thickness-sized corner radius can't
--- give. WoW's mask API can't subtract (no true ring/annulus without a custom
--- ring-shaped texture asset), so this disc necessarily sits behind the whole
--- interior: wherever the interior fill's alpha is below 1, border color
--- shows through it. That's an accepted, deliberate trade-off for a genuinely
--- round outline, not a bug - keep interior colors near-opaque to minimize it.
+-- Plain textures instead of a backdrop: SetBackdrop is drawn outside the texture pipeline, so a mask can't round it.
+-- Round mode reuses borderTopTexture as one full-size masked disc, since WoW masks can't subtract to make a ring.
+-- The disc sits behind the fill, so border color shows through a translucent fill: accepted trade-off.
 
 function ns.CreatePointFrame(parent)
     local point = CreateFrame("Frame", nil, parent)
@@ -66,17 +46,12 @@ function ns.CreatePointFrame(parent)
     return point
 end
 
--- Pixel snapping. Settings are in UI units, which rarely equal a whole number
--- of screen pixels (it depends on UI scale and resolution). WoW snaps each
--- texture edge to the pixel grid on its own, so a 1.4-pixel border is drawn 1
--- or 2 pixels thick depending on where the tracker sits, and changes as it is
--- moved. Every size is therefore rounded to whole pixels for the region's
--- effective scale before use; minPixels keeps a thin border from rounding to 0.
+-- WoW snaps each texture edge to the pixel grid on its own, so an unrounded size is drawn thicker or thinner
+-- depending on where the tracker sits. minPixels keeps a thin border from rounding to 0.
 function ns.SnapToPixels(value, region, minPixels)
     return PixelUtil.GetNearestPixelSize(value, region:GetEffectiveScale(), minPixels)
 end
 
--- Point width, height, and spacing of the live tracker, in whole pixels.
 function ns.GetPointMetrics(db)
     local tracker = ns.tracker
     if not tracker then
@@ -85,12 +60,7 @@ function ns.GetPointMetrics(db)
     return ns.SnapToPixels(db.pointWidth, tracker, 1), ns.SnapToPixels(db.pointHeight, tracker, 1), ns.SnapToPixels(db.spacing, tracker)
 end
 
--- Border thickness actually drawn, in UI units. db.borderSize counts screen
--- pixels, not UI units: a UI unit is a fraction of a pixel at most scales, so
--- stepping in units gave uneven jumps once rounded (1 -> 1 pixel, 2 -> 3).
--- Capped at a third of the point's smaller side, so a thick border on a small
--- point can't swallow the fill. Used by both the tracker and the preview so
--- they agree.
+-- db.borderSize counts screen pixels. Capped at a third of the point's smaller side so the border can't swallow the fill.
 function ns.GetBorderInset(db, pointWidth, pointHeight, region)
     if not db.showBorder then
         return 0
@@ -218,18 +188,12 @@ function ns.AnchorCounterText(tracker, db)
     counter:SetPoint("CENTER", tracker, "CENTER", centerOffset + db.counterOffsetX, db.counterOffsetY)
 end
 
--- The tracker frame is sized for the full 10-point pool, so while unlocked
--- its mouse area is trimmed to the visible points; otherwise the unused slots
--- would swallow clicks meant for whatever is behind them.
+-- The frame is sized for the full 10-point pool; the unused slots would otherwise swallow clicks.
 local function UpdateHitRect(tracker, db)
     tracker:SetHitRectInsets(0, -2 * ns.GetCounterCenterOffset(db, tracker.visibleCount), 0, 0)
 end
 
--- Waiting for the attached frame. ADDON_LOADED and PLAYER_ENTERING_WORLD
--- (Bindings.lua) catch most frames, but not one built later: by a timer, on
--- first use, or in another addon's own PLAYER_ENTERING_WORLD handler that runs
--- after this one. So while the attachment is pending, the frame is also looked
--- up once a second for a while. Any later layout starts the wait again.
+-- ADDON_LOADED and PLAYER_ENTERING_WORLD miss frames built later (by a timer or on first use), so also poll.
 local ATTACH_RETRY_SECONDS = 60
 local attachRetryTicker
 
@@ -255,9 +219,7 @@ local function StartAttachRetry()
     end)
 end
 
--- Whether any part of the visible points is inside the screen. nil when the
--- tracker has no rectangle yet. The frame is sized for the full 10-point pool
--- and the points fill it from the left, so only the visible part is tested.
+-- nil when the tracker has no rectangle yet. Only the visible points are tested, not the full 10-point frame.
 local function IsTrackerOnScreen(tracker, db)
     local left, bottom, width, height = tracker:GetRect()
     if not left then
@@ -273,11 +235,7 @@ local function PlaceAtDefault(tracker)
     PixelUtil.SetPoint(tracker, fallback.point, UIParent, fallback.relativePoint, fallback.x, fallback.y)
 end
 
--- PixelUtil.SetPoint rounds only the offset. With a centred anchor and an odd
--- pixel width or height the frame's edges still land on half pixels, and WoW
--- then rounds each texture edge either way. So once the frame is placed and
--- sized, it is nudged by the fraction of a pixel that puts its bottom-left
--- corner on the pixel grid; its size is whole pixels, so every edge follows.
+-- PixelUtil.SetPoint rounds only the offset: a centred anchor with an odd pixel size still puts edges on half pixels.
 -- The saved position is not changed.
 local function AlignToPixelGrid(tracker)
     local left, bottom = tracker:GetLeft(), tracker:GetBottom()
@@ -309,7 +267,6 @@ function ns.ApplyLayout()
             anchorFrame = frame
         else
             -- Frame not created yet: use the screen for now, retry later.
-            -- The saved frame name and offsets are kept as they are.
             ns.attachmentPending = true
         end
     end
@@ -318,10 +275,7 @@ function ns.ApplyLayout()
     else
         StopAttachRetry()
     end
-    -- SetPoint raises an error for anchors WoW refuses (the tracker itself, a
-    -- frame anchored to the tracker, a protected frame in combat). Fall back
-    -- to the default screen position instead of breaking the whole layout.
-    -- PixelUtil.SetPoint rounds the offsets to whole pixels as well.
+    -- SetPoint raises an error for anchors WoW refuses (itself, a frame anchored to it, a protected frame in combat).
     if not pcall(PixelUtil.SetPoint, tracker, position.point, anchorFrame, position.relativePoint, position.x, position.y) then
         PlaceAtDefault(tracker)
     end
@@ -345,12 +299,8 @@ function ns.ApplyLayout()
     tracker:SetSize((pointWidth * #pointFrames) + (spacing * (#pointFrames - 1)), pointHeight)
     UpdateHitRect(tracker, db)
 
-    -- A screen position that leaves none of the visible points on screen (a
-    -- damaged or imported profile, one saved at another resolution, or the
-    -- offsets of an attachment whose frame does not exist yet, which only make
-    -- sense against that frame) is shown at the default position instead. The
-    -- saved value is not changed. Not done once attached to another frame:
-    -- only that frame knows where the tracker belongs.
+    -- A position with no visible point on screen is shown at the default instead; the saved value stays.
+    -- Not when attached: only that frame knows where the tracker belongs.
     if anchorFrame == UIParent and IsTrackerOnScreen(tracker, db) == false then
         PlaceAtDefault(tracker)
     end
@@ -371,8 +321,6 @@ function ns.UpdateTracker()
         return
     end
 
-    -- The settings window shows one color button and one preview point per
-    -- real point, so tell it when the maximum changes (talent or spec change).
     local maxPoints = ns.GetMaxPoints()
     if maxPoints ~= tracker.maxPoints then
         tracker.maxPoints = maxPoints
@@ -391,16 +339,13 @@ function ns.UpdateTracker()
 
     local pointFrames = ns.pointFrames
     local current = UnitPower("player", ns.activePowerType)
-    -- Same maximum as the Colors tab and the preview.
     local maximum = maxPoints
     for index, point in ipairs(pointFrames) do
         point:SetShown(index <= maximum)
         SetPointVisual(point, index <= current, index)
     end
 
-    -- The mouse area and the counter's centre depend only on how many points
-    -- are visible (and on the layout, which ApplyLayout handles), so they are
-    -- left alone on ordinary resource changes.
+    -- These depend only on the visible point count, so ordinary resource changes skip them.
     if maximum ~= tracker.visibleCount then
         tracker.visibleCount = maximum
         UpdateHitRect(tracker, db)
@@ -429,8 +374,6 @@ function ns.SavePosition()
     end
 end
 
--- Single place that locks/unlocks dragging, so the slash commands, the Layout
--- tab button, and the frame picker all keep the button text in sync.
 function ns.SetTrackerUnlocked(unlocked)
     local tracker = ns.tracker
     tracker.isUnlocked = unlocked and true or false

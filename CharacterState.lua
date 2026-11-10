@@ -1,17 +1,11 @@
 local ADDON_NAME, ns = ...
 
--- Per-character saved profile (ComboPointsDB.profiles[characterKey]).
-
 local function GetCharacterKey()
     local name, realm = UnitFullName("player")
     return (realm or GetRealmName() or "Unknown") .. " - " .. (name or UnitName("player") or "Unknown")
 end
 
--- Profile validation. Every profile that becomes ns.db (saved, copied, or
--- imported) is rebuilt from ns.DEFAULTS: a key is kept only when its type
--- matches the default, numbers are clamped to ns.NUMBER_LIMITS (Core.lua), anchor
--- points and strata must be real ones, and unknown keys are dropped. A
--- wrong type would otherwise raise an error in the layout code at every login.
+-- Every profile is rebuilt from ns.DEFAULTS: a wrong type would raise an error in the layout code at every login.
 
 local VALID_ANCHOR_POINTS = {}
 for _, anchor in ipairs(ns.ANCHOR_POINTS) do
@@ -21,7 +15,6 @@ local VALID_STRATA = {}
 for _, level in ipairs(ns.STRATA_LEVELS) do
     VALID_STRATA[level.value] = true
 end
--- String settings that only accept a fixed set of values.
 local STRING_CHOICES = { point = VALID_ANCHOR_POINTS, relativePoint = VALID_ANCHOR_POINTS, strata = VALID_STRATA }
 
 local function SanitizeInto(defaults, source, target)
@@ -101,12 +94,7 @@ function ns.CopyProfileToCurrent(sourceKey)
     return true
 end
 
--- Export/import. A profile is exported as JSON text. Import reads JSON, and
--- still reads the Lua-table text that versions before 2.0.0 exported. Both
--- readers are small data-only parsers: they build tables, strings, numbers and
--- booleans and nothing else. The pasted text is never compiled or run (no
--- loadstring), so it can neither reach globals nor loop; ns.ImportProfile then
--- validates the result against ns.DEFAULTS.
+-- Both readers are data-only parsers: the pasted text is never compiled or run (no loadstring).
 
 local JSON_ESCAPES = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
 
@@ -116,7 +104,6 @@ local function EncodeJsonString(value)
     end) .. '"'
 end
 
--- A table whose keys are exactly 1..n (pointColors) is written as an array.
 local function IsSequence(value)
     local count = 0
     for _ in pairs(value) do
@@ -185,7 +172,6 @@ local MAX_IMPORT_DEPTH = 8
 local STRING_ESCAPES = { n = "\n", r = "\r", t = "\t", ["\\"] = "\\", ['"'] = '"', ["\n"] = "\n" }
 local JSON_UNESCAPES = { n = "\n", r = "\r", t = "\t", b = "\b", f = "\f", ["\\"] = "\\", ['"'] = '"', ["/"] = "/" }
 
--- UTF-8 bytes for a \uXXXX code point (below 0x10000).
 local function EncodeUtf8(code)
     if code < 0x80 then
         return string.char(code)
@@ -195,10 +181,7 @@ local function EncodeUtf8(code)
     return string.char(0xE0 + math.floor(code / 0x1000), 0x80 + (math.floor(code / 0x40) % 0x40), 0x80 + (code % 0x40))
 end
 
--- JSON reader. Raises an error on malformed text; ns.DeserializeProfile wraps
--- it in pcall. An array becomes a table with keys 1..n. An object key that is
--- a whole number ("3") becomes that number, since profile tables indexed by
--- number are written as objects when they have gaps.
+-- An object key that is a whole number ("3") becomes that number: number-indexed tables with gaps are written as objects.
 local function ParseJsonText(text)
     local position = 1
     local ParseValue
@@ -343,8 +326,7 @@ local function ParseJsonText(text)
     return result
 end
 
--- Reader for the Lua-table text exported before 2.0.0, kept so old strings
--- still import. Raises an error on malformed text, like ParseJsonText.
+-- Reads the Lua-table text exported before 2.0.0, so old strings still import.
 local function ParseLegacyText(text)
     local position = 1
     local ParseValue
@@ -465,7 +447,6 @@ function ns.DeserializeProfile(text)
     if type(text) ~= "string" or text:match("^%s*$") or #text > MAX_IMPORT_LENGTH then
         return nil
     end
-    -- Current format first, then the pre-2.0.0 one. Neither runs the text.
     for _, parse in ipairs({ ParseJsonText, ParseLegacyText }) do
         local ok, result = pcall(parse, text)
         if ok and type(result) == "table" then
@@ -482,9 +463,6 @@ function ns.ImportProfile(data)
     AdoptProfile(data)
     return true
 end
-
--- Class/spec detection: which resource to track, and whether the current
--- class+spec actually uses that resource.
 
 local function GetSpecializationID()
     local specialization = C_SpecializationInfo.GetSpecialization()
@@ -512,8 +490,7 @@ function ns.IsTrackedClass(classFile)
     return classFile == "ROGUE" or classFile == "PALADIN" or classFile == "WARLOCK"
 end
 
--- Returns the Enum.PowerType to read and the matching power token, which is
--- what UNIT_POWER_FREQUENT passes as its second argument.
+-- The token is what UNIT_POWER_FREQUENT passes as its second argument.
 function ns.GetPowerType(classFile)
     classFile = classFile or select(2, UnitClass("player"))
     if classFile == "DRUID" or classFile == "ROGUE" then

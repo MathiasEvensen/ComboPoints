@@ -1,9 +1,5 @@
 local ADDON_NAME, ns = ...
--- Widgets.lua must run before this file (see load order in ComboPoints.toc)
--- so ns.Widgets is already populated here.
 local Widgets = ns.Widgets
-
--- Layout tab: size/spacing/shape, position reset, enable/combat/spec checks
 
 local function BuildLayoutTab(configPanel, layoutPage)
     local enabledCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
@@ -84,8 +80,6 @@ local function BuildLayoutTab(configPanel, layoutPage)
         ns.UpdateTracker()
     end)
 
-    -- Strata: which UI layer the tracker is drawn in, for when it ends up
-    -- behind (or in front of) other frames.
     local strataLowerButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
     strataLowerButton:SetSize(22, 22)
     strataLowerButton:SetPoint("TOPLEFT", layoutPage, "TOP", 0, -396)
@@ -130,9 +124,7 @@ local function BuildLayoutTab(configPanel, layoutPage)
     end)
     RefreshStrata()
 
-    -- Non-Feral druids still build combo points in Cat Form (cat-weaving), but
-    -- many only shift for travel speed, so this stays opt-in. It only narrows
-    -- the usable-specs filter, so it is disabled while that filter is off.
+    -- Opt-in: many non-Feral druids only shift to Cat Form for travel speed.
     local catFormCheck
     if ns.classFile == "DRUID" then
         catFormCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
@@ -158,8 +150,6 @@ local function BuildLayoutTab(configPanel, layoutPage)
         ns.UpdateTracker()
     end)
 end
-
--- Profiles tab: copy another character's settings onto the current one
 
 local function BuildProfilesTab(configPanel, profilesPage)
     local profilesTitle = profilesPage:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
@@ -301,8 +291,6 @@ local function BuildProfilesTab(configPanel, profilesPage)
     end)
 end
 
--- Colors tab: static or per-point active colors, and the empty color
-
 local function BuildColorsTab(configPanel, colorsPage)
     local colorModeButton = CreateFrame("Button", nil, colorsPage, "UIPanelButtonTemplate")
     colorModeButton:SetHeight(26)
@@ -321,7 +309,6 @@ local function BuildColorsTab(configPanel, colorsPage)
         staticColorButton:SetShown(not ns.db.useIndividualColors)
         staticColorButton.preview:SetShown(not ns.db.useIndividualColors)
         individualColorLabel:SetShown(ns.db.useIndividualColors)
-        -- One button per point the character really has (ns.GetMaxPoints).
         local pointCount = ns.GetMaxPoints()
         for index, button in ipairs(individualColorButtons) do
             local shown = ns.db.useIndividualColors and index <= pointCount
@@ -329,7 +316,6 @@ local function BuildColorsTab(configPanel, colorsPage)
             button.preview:SetShown(shown)
         end
     end
-    -- Called by Tracker.lua when the character's maximum changes.
     configPanel.RefreshPointCount = RefreshColorMode
     colorModeButton:SetScript("OnClick", function()
         ns.db.useIndividualColors = not ns.db.useIndividualColors
@@ -339,8 +325,6 @@ local function BuildColorsTab(configPanel, colorsPage)
     end)
     RefreshColorMode()
 end
-
--- Style tab: background/border on-off and colors, border thickness
 
 local function BuildStyleTab(configPanel, stylePage)
     local backgroundButton = CreateFrame("Button", nil, stylePage, "UIPanelButtonTemplate")
@@ -464,8 +448,6 @@ local function BuildStyleTab(configPanel, stylePage)
     end)
 end
 
--- Attach tab: pick a UI frame to snap to, anchor point, offset sliders
-
 local function BuildAttachTab(configPanel, attachPage)
     local RefreshAttachmentText
     local RefreshAnchorButtons
@@ -537,9 +519,6 @@ local function BuildAttachTab(configPanel, attachPage)
         xOffsetSlider:RefreshPosition()
         yOffsetSlider:RefreshPosition()
     end
-    -- Called by Tracker.lua after a drag or a position reset changes
-    -- ns.db.position or ns.db.snapToFrame, so every control that shows them
-    -- (here and the Layout tab's unlock button) is refreshed in one place.
     configPanel.RefreshPositionControls = function()
         RefreshAnchorButtons()
         RefreshOffsetControls()
@@ -553,16 +532,12 @@ local function BuildAttachTab(configPanel, attachPage)
     pickerHighlight:SetBackdropBorderColor(1, 0.82, 0, 1)
     pickerHighlight:Hide()
 
-    -- The tracker, the settings window, and anything inside them are not valid
-    -- targets: anchoring the tracker to itself is an error, and the window's
-    -- own controls are only on screen while it is open.
+    -- Anchoring the tracker to itself is an error, and the window's controls only exist while it is open.
     local function IsOwnFrame(frame)
         return frame == configPanel or frame == ns.tracker or frame == pickerHighlight
     end
 
-    -- Nearest named frame at or above the mouse focus. The whole parent chain
-    -- is walked, and IsForbidden is checked before any other method: calling
-    -- GetName or GetParent on a forbidden frame (some nameplates) is an error.
+    -- IsForbidden is checked first: any other method on a forbidden frame (some nameplates) is an error.
     local function GetNamedFrameUnderCursor()
         for _, focus in ipairs(GetMouseFoci()) do
             local frame, named, usable = focus, nil, true
@@ -594,8 +569,6 @@ local function BuildAttachTab(configPanel, attachPage)
         pickButton:SetText("Pick frame")
     end
     -- Combat start and panel hide get no OnKeyUp to restore key propagation, so this does it.
-    -- Bindings.lua calls it on PLAYER_REGEN_DISABLED, before lockdown blocks SetPropagateKeyboardInput.
-    -- Returns true if a pick was in progress.
     configPanel.CancelFramePicker = function()
         local wasPicking = configPanel.isPickingFrame
         if wasPicking then
@@ -608,8 +581,7 @@ local function BuildAttachTab(configPanel, attachPage)
     end
     configPanel:HookScript("OnHide", function()
         if configPanel.swallowingEscape then
-            -- Closed by Esc: key propagation must stay off until the key event
-            -- is over (see OnKeyDown), so only stop the picker here.
+            -- Closed by Esc: key propagation must stay off until the key event is over (see OnKeyDown).
             if configPanel.isPickingFrame then
                 StopFramePicker()
             end
@@ -650,7 +622,7 @@ local function BuildAttachTab(configPanel, attachPage)
         return false
     end
 
-    -- The player's own cast; pcall because cast info can be restricted.
+    -- pcall because cast info can be restricted.
     local function IsCasting()
         local ok, casting = pcall(function()
             return (UnitCastingInfo("player") or UnitChannelInfo("player")) and true or false
@@ -658,14 +630,8 @@ local function BuildAttachTab(configPanel, attachPage)
         return ok and casting
     end
 
-    -- True when Esc should do its normal job instead of closing this window:
-    --  * in combat, where the key can't be swallowed, so closing the window
-    --    would also open the game menu or clear the target from one press;
-    --  * while the game's Settings window or the game menu is open, so Esc
-    --    closes that one;
-    --  * while a popup (such as this addon's own confirmation) or the color
-    --    picker is open, or a spell is being cast or targeted: the game gives
-    --    all of those Esc before any window.
+    -- In combat the key can't be swallowed, so closing the window would also open the game menu.
+    -- The game gives popups, the color picker, and casts Esc before any window.
     local function EscapeBelongsElsewhere()
         return InCombatLockdown()
             or (SettingsPanel and SettingsPanel:IsShown())
@@ -680,23 +646,17 @@ local function BuildAttachTab(configPanel, attachPage)
     configPanel:SetPropagateKeyboardInput(true)
     configPanel:SetScript("OnKeyDown", function(self, key)
         if not configPanel.isPickingFrame then
-            -- Esc closes this window, handled here rather than through
-            -- UISpecialFrames: WoW closes all of those frames together, which
-            -- closed this window whenever the game's Settings window closed.
-            -- Esc is left alone, and this window stays open, whenever the
-            -- key belongs to something else first (see EscapeBelongsElsewhere).
+            -- Not UISpecialFrames: WoW closes all of those together, which closed this window with the game's Settings window.
             if key ~= "ESCAPE" or EscapeBelongsElsewhere() then
                 return
             end
-            -- An open dropdown list takes Esc first; the window stays open,
-            -- so OnKeyUp restores key propagation.
+            -- The window stays open, so OnKeyUp restores key propagation.
             if Widgets.CloseOpenDropdown() then
                 self:SetPropagateKeyboardInput(false)
                 return
             end
-            -- Swallow the key so it doesn't also open the game menu. A
-            -- hidden frame gets no OnKeyUp, so propagation is restored on
-            -- the next frame (or by CancelFramePicker if combat starts first).
+            -- Swallow the key so it doesn't also open the game menu. A hidden frame gets
+            -- no OnKeyUp, so propagation is restored on the next frame.
             self:SetPropagateKeyboardInput(false)
             configPanel.swallowingEscape = true
             C_Timer.After(0, function()
@@ -731,7 +691,6 @@ local function BuildAttachTab(configPanel, attachPage)
             end
         end
     end)
-    -- OnKeyDown swallows picker keys by turning propagation off; turn it back on once the key is released
     configPanel:SetScript("OnKeyUp", function(self)
         if not self:GetPropagateKeyboardInput() then
             self:SetPropagateKeyboardInput(true)
@@ -739,8 +698,6 @@ local function BuildAttachTab(configPanel, attachPage)
     end)
     RefreshAttachmentText()
 end
-
--- Live preview strip at the bottom of the panel (full/2-5/empty states)
 
 local function BuildPreviewSection(configPanel)
     local preview = CreateFrame("Frame", nil, configPanel, "BackdropTemplate")
@@ -750,8 +707,6 @@ local function BuildPreviewSection(configPanel)
     preview:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     preview:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
-    -- The active count of "full" and "partial", and the "partial" label, are
-    -- filled in from the character's real maximum on every redraw.
     local PREVIEW_POINTS = #ns.DEFAULTS.pointColors
     local previewStates = {
         { kind = "full", label = "Full", y = 34 },
@@ -772,7 +727,6 @@ local function BuildPreviewSection(configPanel)
         state.counter = ns.CreateCounterText(preview)
     end
 
-    -- Room for the points next to the labels, and the width of the points at full size.
     local function PreviewWidths(db)
         local pointCount = PreviewPointCount()
         local fullWidth = (math.min(db.pointWidth, 32) * pointCount) + (math.min(db.spacing, 8) * (pointCount - 1))
@@ -835,10 +789,7 @@ local function BuildPreviewSection(configPanel)
     end
 
     ns.UpdateConfigPreview = UpdateConfigPreview
-    -- OnSizeChanged fires every frame while the window is resized. The preview's layout only
-    -- depends on its width while that is too narrow for the points (they scale down), so it
-    -- is redrawn only then, and once more when it stops being too narrow. The preview spans
-    -- the window, so this also covers the window's own size changes.
+    -- OnSizeChanged fires every frame during a resize; the layout only depends on width while too narrow for the points.
     preview:SetScript("OnSizeChanged", function()
         local maxWidth, totalWidth = PreviewWidths(ns.db)
         if previewScaled or totalWidth > maxWidth then
@@ -847,8 +798,6 @@ local function BuildPreviewSection(configPanel)
     end)
     UpdateConfigPreview()
 end
-
--- Panel frame itself: chrome, tabs/pages, wires the sections above together
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 520, 670
 local MIN_WIDTH, MAX_WIDTH = unpack(ns.NUMBER_LIMITS.width)
@@ -897,9 +846,7 @@ function ns.CreateConfigPanel()
     end)
     -- Below DIALOG, so confirmation popups and the color picker open on top of it.
     configPanel:SetFrameStrata("HIGH")
-    -- Deliberately not in UISpecialFrames: WoW closes every frame listed there
-    -- together, so closing the game's Settings window would close this one too.
-    -- Esc is handled in the window's own OnKeyDown (BuildAttachTab) instead.
+    -- Deliberately not in UISpecialFrames (see OnKeyDown in BuildAttachTab).
     configPanel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
     configPanel:SetBackdropColor(0, 0, 0, 0.95)
 

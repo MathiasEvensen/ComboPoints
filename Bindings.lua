@@ -42,7 +42,7 @@ SlashCmdList.COMBOPOINTS = function(message)
     end
 end
 
--- Addon compartment (minimap addon menu) entry, named in ComboPoints.toc.
+-- Named in ComboPoints.toc.
 function ComboPoints_OnAddonCompartmentClick()
     if ns.configPanel then
         ToggleConfig()
@@ -68,9 +68,7 @@ ns.addon:SetScript("OnEvent", function(_, event, unit, powerToken)
         return
     end
 
-    -- Fires for every power type (energy and mana tick constantly); only the
-    -- tracked resource matters. Same event and tokens as Blizzard's own class
-    -- power bars (Blizzard_UnitFrame ClassPowerBar.lua and its XML, 12.1.5).
+    -- Fires for every power type (energy and mana tick constantly); only the tracked resource matters.
     if event == "UNIT_POWER_FREQUENT" and powerToken ~= ns.activePowerToken then
         return
     end

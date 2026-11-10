@@ -15,8 +15,7 @@ ns.DEFAULTS = {
         [3] = { r = 1, g = 0.82, b = 0, a = 1 },
         [4] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
         [5] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
-        -- Only reachable when the game reports a maximum above 5, for example
-        -- rogues with Deeper Stratagem / Secret Stratagem.
+        -- Only reached when the game reports a maximum above 5 (rogue talents).
         [6] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
         [7] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
     },
@@ -46,12 +45,7 @@ ns.DEFAULTS = {
     enabled = true,
 }
 
--- Allowed range of every numeric setting, keyed by the setting's own name
--- wherever it sits in the profile. The one source for both the sliders
--- (Widgets.AddSlider) and profile validation (ns.SanitizeProfile). x/y cover
--- the tracker position and the settings window position; the bound is far
--- wider than any screen, so it only rejects garbage and never changes an
--- offset a player set, including an offset from an attached frame.
+-- x/y are bounded only to reject garbage: an offset a player set must never change.
 ns.NUMBER_LIMITS = {
     pointWidth = { 8, 100 },
     pointHeight = { 8, 100 },
@@ -70,8 +64,7 @@ ns.NUMBER_LIMITS = {
     a = { 0, 1 },
 }
 
--- The nine anchor points, in the Attach tab's button order (rows of three).
--- Also the set profile validation accepts for position.point/relativePoint.
+-- In the Attach tab's button order (rows of three).
 ns.ANCHOR_POINTS = {
     { point = "TOPLEFT", label = "Top left" },
     { point = "TOP", label = "Top" },
@@ -84,9 +77,7 @@ ns.ANCHOR_POINTS = {
     { point = "BOTTOMRIGHT", label = "Bottom right" },
 }
 
--- Frame strata the tracker can be drawn in, lowest first. MEDIUM is what a
--- plain frame gets; the levels above DIALOG are left out so the tracker can't
--- cover fullscreen UI and tooltips.
+-- Levels above DIALOG are left out so the tracker can't cover fullscreen UI and tooltips.
 ns.STRATA_LEVELS = {
     { value = "BACKGROUND", label = "Background" },
     { value = "LOW", label = "Low" },
@@ -95,7 +86,6 @@ ns.STRATA_LEVELS = {
     { value = "DIALOG", label = "Dialog" },
 }
 
--- Shared mutable state, populated by other addon files as they load and run.
 ns.db = nil
 ns.tracker = nil
 ns.configPanel = nil
@@ -104,26 +94,15 @@ ns.activePowerType = nil
 ns.activePowerToken = nil
 ns.currentCharacterKey = nil
 ns.classFile = nil
--- Combat state is tracked from PLAYER_REGEN_DISABLED/ENABLED (Bindings.lua)
--- instead of InCombatLockdown(), which is still false while the
--- PLAYER_REGEN_DISABLED handlers run.
+-- Not InCombatLockdown(): it is still false while PLAYER_REGEN_DISABLED handlers run.
 ns.inCombat = false
--- True while the profile is attached to a frame that does not exist yet (for
--- example one another addon creates later); the layout is retried from
--- Bindings.lua (events) and Tracker.lua (timer).
+-- True while the attached frame does not exist yet.
 ns.attachmentPending = false
 
--- Replaced with the real refresher once the config panel builds its live
--- preview (ConfigPanel.lua BuildPreviewSection); a no-op until then so
--- callers can invoke it unconditionally.
+-- A no-op until ConfigPanel.lua replaces it, so callers can invoke it unconditionally.
 ns.UpdateConfigPreview = function() end
 
--- Fonts: "" means the client's standard font. The candidate list covers the
--- fonts WoW ships (locale builds ship different subsets), and each one is
--- probed with a throwaway font string before being offered, so a font missing
--- from this client never reaches the dropdown. Any font another addon has
--- registered with LibSharedMedia-3.0 is merged in when that library is loaded;
--- this addon does not embed it.
+-- "" means the client's standard font. Each candidate is probed first: locale builds ship different subsets.
 
 local FONT_CANDIDATES = {
     { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
@@ -148,10 +127,8 @@ function ns.GetDefaultFontPath()
     return STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 end
 
--- SetFont's return value is inconsistent across client versions, so success is
--- confirmed by reading the path back where possible. Newer clients may report
--- the applied font as a numeric file ID instead of a path, which cannot be
--- compared to the path string; in that case trust SetFont's boolean result.
+-- SetFont's return value varies by client version, so the path is read back where possible.
+-- Newer clients may report a numeric file ID instead; then SetFont's boolean is trusted.
 function ns.TrySetFont(fontString, path, size, flags)
     if not path or path == "" then
         return false
@@ -168,11 +145,7 @@ function ns.TrySetFont(fontString, path, size, flags)
 end
 
 local fontTester
--- Font paths already confirmed to load, keyed by lower-case path. Only
--- successes are remembered: a font can fail its first probe (the list is first
--- built at login, before the client has loaded the file) and pass a later one,
--- so a failed font is probed again on every call instead of being cached as
--- missing.
+-- Only successes are cached: the first probe at login can fail before the client has loaded the file.
 local confirmedFonts = {}
 
 function ns.GetAvailableFonts()
@@ -218,7 +191,6 @@ function ns.GetFontDisplayName(path)
     return path:match("([^\\/]+)$") or path
 end
 
--- Returns the named frame, or nil when no usable frame has that name (yet).
 function ns.GetAttachmentFrame(frameName)
     local frame = frameName and _G[frameName]
     if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" then
@@ -230,7 +202,6 @@ function ns.GetAttachmentFrame(frameName)
     return frame
 end
 
--- Yes/no prompt for actions that overwrite the profile or reload the UI.
 StaticPopupDialogs["COMBOPOINTS_CONFIRM"] = {
     text = "%s",
     button1 = ACCEPT,
