@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The packager fills @project-version@ with the tag verbatim, "v" included.
+      - name: Set TOC version without the v prefix
+        run: sed -i "s/@project-version@/${GITHUB_REF_NAME#v}/" ComboPoints.toc
+
       - name: Package and release
         uses: BigWigsMods/packager@v2
         env:
