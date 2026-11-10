@@ -15,9 +15,9 @@ local function BuildLayoutTab(configPanel, layoutPage)
         ns.UpdateTracker()
     end)
 
-    Widgets.AddSlider(layoutPage, "Point width", "pointWidth", -48, 8, 100, 1)
-    Widgets.AddSlider(layoutPage, "Point height", "pointHeight", -116, 8, 100, 1)
-    Widgets.AddSlider(layoutPage, "Spacing", "spacing", -184, 0, 50, 1)
+    Widgets.AddSlider(layoutPage, "Point width", "pointWidth", -48, 1)
+    Widgets.AddSlider(layoutPage, "Point height", "pointHeight", -116, 1)
+    Widgets.AddSlider(layoutPage, "Spacing", "spacing", -184, 1)
 
     local shapeButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
     shapeButton:SetHeight(26)
@@ -50,9 +50,7 @@ local function BuildLayoutTab(configPanel, layoutPage)
         if ns.db.snapToFrame then
             return
         end
-        ns.tracker.isUnlocked = not ns.tracker.isUnlocked
-        ns.tracker:EnableMouse(ns.tracker.isUnlocked)
-        configPanel.RefreshUnlockText()
+        ns.SetTrackerUnlocked(not ns.tracker.isUnlocked)
     end)
     configPanel.RefreshUnlockText()
 
@@ -61,8 +59,9 @@ local function BuildLayoutTab(configPanel, layoutPage)
     Widgets.PlaceInColumn(resetPositionButton, layoutPage, "left", -322)
     resetPositionButton:SetText("Reset position")
     resetPositionButton:SetScript("OnClick", function()
-        ns.ResetPosition()
-        configPanel.RefreshUnlockText()
+        ns.Confirm("Reset the tracker position and detach it from its frame?", function()
+            ns.ResetPosition()
+        end)
     end)
 
     local resetButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
@@ -70,8 +69,10 @@ local function BuildLayoutTab(configPanel, layoutPage)
     Widgets.PlaceInColumn(resetButton, layoutPage, "right", -322)
     resetButton:SetText("Reset all defaults")
     resetButton:SetScript("OnClick", function()
-        ns.ResetCurrentProfile()
-        C_UI.Reload()
+        ns.Confirm("Reset all Combo Points settings for this character to defaults? This reloads the UI.", function()
+            ns.ResetCurrentProfile()
+            C_UI.Reload()
+        end)
     end)
 
     local combatOnlyCheck = CreateFrame("CheckButton", nil, layoutPage, "UICheckButtonTemplate")
@@ -82,6 +83,52 @@ local function BuildLayoutTab(configPanel, layoutPage)
         ns.db.onlyInCombat = self:GetChecked() and true or false
         ns.UpdateTracker()
     end)
+
+    -- Strata: which UI layer the tracker is drawn in, for when it ends up
+    -- behind (or in front of) other frames.
+    local strataLowerButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
+    strataLowerButton:SetSize(22, 22)
+    strataLowerButton:SetPoint("TOPLEFT", layoutPage, "TOP", 0, -396)
+    strataLowerButton:SetText("-")
+    local strataRaiseButton = CreateFrame("Button", nil, layoutPage, "UIPanelButtonTemplate")
+    strataRaiseButton:SetSize(22, 22)
+    strataRaiseButton:SetPoint("TOPRIGHT", layoutPage, "TOPRIGHT", -20, -396)
+    strataRaiseButton:SetText("+")
+    local strataLabel = layoutPage:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    strataLabel:SetPoint("LEFT", strataLowerButton, "RIGHT", 4, 0)
+    strataLabel:SetPoint("RIGHT", strataRaiseButton, "LEFT", -4, 0)
+    strataLabel:SetJustifyH("CENTER")
+    strataLabel:SetWordWrap(false)
+    local function GetStrataIndex()
+        for index, level in ipairs(ns.STRATA_LEVELS) do
+            if level.value == ns.db.strata then
+                return index
+            end
+        end
+        return 3
+    end
+    local function RefreshStrata()
+        local index = GetStrataIndex()
+        strataLabel:SetText("Strata: " .. ns.STRATA_LEVELS[index].label)
+        strataLowerButton:SetEnabled(index > 1)
+        strataRaiseButton:SetEnabled(index < #ns.STRATA_LEVELS)
+    end
+    local function StepStrata(step)
+        local level = ns.STRATA_LEVELS[GetStrataIndex() + step]
+        if level then
+            ns.db.strata = level.value
+            RefreshStrata()
+            ns.ApplyLayout()
+            ns.UpdateTracker()
+        end
+    end
+    strataLowerButton:SetScript("OnClick", function()
+        StepStrata(-1)
+    end)
+    strataRaiseButton:SetScript("OnClick", function()
+        StepStrata(1)
+    end)
+    RefreshStrata()
 
     -- Non-Feral druids still build combo points in Cat Form (cat-weaving), but
     -- many only shift for travel speed, so this stays opt-in. It only narrows
@@ -128,7 +175,7 @@ local function BuildProfilesTab(configPanel, profilesPage)
 
     local RefreshCopyControls
     local copySourceKey
-    local copyDropdown = Widgets.AddScrollableDropdown(profilesPage, ADDON_NAME .. "CopyProfileDropdown", -6, -64, 218, {
+    local copyDropdown = Widgets.AddScrollableDropdown(profilesPage, 10, -66, 236, {
         GetItems = function()
             local items = {}
             for _, sourceKey in ipairs(ns.GetOtherCharacterKeys()) do
@@ -153,10 +200,7 @@ local function BuildProfilesTab(configPanel, profilesPage)
 
     local copyApplyButton = CreateFrame("Button", nil, profilesPage, "UIPanelButtonTemplate")
     copyApplyButton:SetSize(224, 26)
-    -- Anchored to the dropdown's own right-edge texture rather than to the page:
-    -- UIDropDownMenuTemplate pads its frame well outside the visible box, so a
-    -- fixed page offset leaves the two controls off by a few pixels vertically.
-    copyApplyButton:SetPoint("LEFT", copyDropdown.frame.Right or copyDropdown.frame, "RIGHT", 6, 0)
+    copyApplyButton:SetPoint("LEFT", copyDropdown.frame, "RIGHT", 6, 0)
     copyApplyButton:SetText("Copy selected profile")
 
     RefreshCopyControls = function()
@@ -166,11 +210,15 @@ local function BuildProfilesTab(configPanel, profilesPage)
         copyApplyButton:SetEnabled(hasSources and copySourceKey ~= nil)
     end
     copyApplyButton:SetScript("OnClick", function()
-        if copySourceKey and ns.CopyProfileToCurrent(copySourceKey) then
-            ns.ApplyLayout()
-            ns.UpdateTracker()
-            C_UI.Reload()
+        local sourceKey = copySourceKey
+        if not sourceKey then
+            return
         end
+        ns.Confirm("Replace this character's Combo Points settings with " .. GetSourceDisplayName(sourceKey) .. "'s? This reloads the UI.", function()
+            if ns.CopyProfileToCurrent(sourceKey) then
+                C_UI.Reload()
+            end
+        end)
     end)
     configPanel.ResetProfileSelection = function()
         copySourceKey = nil
@@ -234,17 +282,19 @@ local function BuildProfilesTab(configPanel, profilesPage)
     importButton:SetText("Import profile from text")
     importButton:SetScript("OnClick", function()
         local data = ns.DeserializeProfile(editBox:GetText())
-        if data and ns.ImportProfile(data) then
-            ns.ApplyLayout()
-            ns.UpdateTracker()
-            C_UI.Reload()
-        else
+        if not data then
             statusText:SetText("Import failed: pasted text is not a valid profile string.")
+            return
         end
+        ns.Confirm("Replace this character's Combo Points settings with the pasted profile? This reloads the UI.", function()
+            if ns.ImportProfile(data) then
+                C_UI.Reload()
+            end
+        end)
     end)
 
     table.insert(configPanel.widthReflows, function(extraWidth)
-        copyDropdown:SetWidth(218 + extraWidth / 2)
+        copyDropdown:SetWidth(236 + extraWidth / 2)
         copyApplyButton:SetWidth(224 + extraWidth / 2)
         statusText:SetWidth(478 + extraWidth)
         editBox:SetWidth(442 + extraWidth)
@@ -261,7 +311,7 @@ local function BuildColorsTab(configPanel, colorsPage)
     Widgets.AddColorPickerButton(colorsPage, "Empty color", function() return ns.db.emptyColor end, -50, false, "right")
     local individualColorLabel = Widgets.AddLabel(colorsPage, "Individual active-point colors", 10, -92)
     local individualColorButtons = {}
-    for index = 1, 5 do
+    for index = 1, #ns.DEFAULTS.pointColors do
         local column = (index - 1) % 2 == 0 and "left" or "right"
         local row = math.floor((index - 1) / 2)
         individualColorButtons[index] = Widgets.AddColorPickerButton(colorsPage, "Point " .. index .. " color", function() return ns.db.pointColors[index] end, -116 - (row * 34), false, column)
@@ -271,11 +321,16 @@ local function BuildColorsTab(configPanel, colorsPage)
         staticColorButton:SetShown(not ns.db.useIndividualColors)
         staticColorButton.preview:SetShown(not ns.db.useIndividualColors)
         individualColorLabel:SetShown(ns.db.useIndividualColors)
-        for _, button in ipairs(individualColorButtons) do
-            button:SetShown(ns.db.useIndividualColors)
-            button.preview:SetShown(ns.db.useIndividualColors)
+        -- One button per point the character really has (ns.GetMaxPoints).
+        local pointCount = ns.GetMaxPoints()
+        for index, button in ipairs(individualColorButtons) do
+            local shown = ns.db.useIndividualColors and index <= pointCount
+            button:SetShown(shown)
+            button.preview:SetShown(shown)
         end
     end
+    -- Called by Tracker.lua when the character's maximum changes.
+    configPanel.RefreshPointCount = RefreshColorMode
     colorModeButton:SetScript("OnClick", function()
         ns.db.useIndividualColors = not ns.db.useIndividualColors
         RefreshColorMode()
@@ -317,7 +372,7 @@ local function BuildStyleTab(configPanel, stylePage)
         ns.UpdateTracker()
     end)
     RefreshBorderText()
-    Widgets.AddSlider(stylePage, "Border thickness", "borderSize", -108, 1, 8, 1)
+    Widgets.AddSlider(stylePage, "Border thickness (pixels)", "borderSize", -108, 1)
 
     Widgets.AddLabel(stylePage, "Point counter", 10, -152)
 
@@ -345,7 +400,7 @@ local function BuildStyleTab(configPanel, stylePage)
         ns.ApplyLayout()
         ns.UpdateTracker()
     end)
-    local fontPicker = Widgets.AddScrollableDropdown(stylePage, ADDON_NAME .. "CounterFontDropdown", -6, -266, 218, {
+    local fontPicker = Widgets.AddScrollableDropdown(stylePage, 10, -268, 236, {
         GetItems = function()
             local items = {}
             for _, font in ipairs(ns.GetAvailableFonts()) do
@@ -367,7 +422,7 @@ local function BuildStyleTab(configPanel, stylePage)
         end,
     })
 
-    outlineCheck:SetPoint("LEFT", fontPicker.frame.Right or fontPicker.frame, "RIGHT", 10, 0)
+    outlineCheck:SetPoint("LEFT", fontPicker.frame, "RIGHT", 10, 0)
 
     RefreshCounterControls = function()
         counterButton:SetText(ns.db.showCounter and "Counter: On" or "Counter: Off")
@@ -400,12 +455,12 @@ local function BuildStyleTab(configPanel, stylePage)
     end)
     RefreshCounterControls()
 
-    Widgets.AddSlider(stylePage, "Counter font size", "counterFontSize", -308, 6, 48, 1)
-    Widgets.AddSlider(stylePage, "Counter X offset", "counterOffsetX", -370, -200, 200, 1, "left")
-    Widgets.AddSlider(stylePage, "Counter Y offset", "counterOffsetY", -370, -200, 200, 1, "right")
+    Widgets.AddSlider(stylePage, "Counter font size", "counterFontSize", -308, 1)
+    Widgets.AddSlider(stylePage, "Counter X offset", "counterOffsetX", -370, 1, "left")
+    Widgets.AddSlider(stylePage, "Counter Y offset", "counterOffsetY", -370, 1, "right")
 
     table.insert(configPanel.widthReflows, function(extraWidth)
-        fontPicker:SetWidth(218 + extraWidth / 2)
+        fontPicker:SetWidth(236 + extraWidth / 2)
     end)
 end
 
@@ -438,25 +493,13 @@ local function BuildAttachTab(configPanel, attachPage)
     Widgets.PlaceInColumn(attachResetPositionButton, attachPage, "right", -120)
     attachResetPositionButton:SetText("Reset position")
     attachResetPositionButton:SetScript("OnClick", function()
-        ns.ResetPosition()
-        configPanel.RefreshUnlockText()
-        RefreshAttachmentText()
-        RefreshAnchorButtons()
-        RefreshOffsetControls()
+        ns.Confirm("Reset the tracker position and detach it from its frame?", function()
+            ns.ResetPosition()
+        end)
     end)
 
     Widgets.AddLabel(attachPage, "Attach point", 10, -166)
-    local anchorOptions = {
-        { point = "TOPLEFT", label = "Top left" },
-        { point = "TOP", label = "Top" },
-        { point = "TOPRIGHT", label = "Top right" },
-        { point = "LEFT", label = "Left" },
-        { point = "CENTER", label = "Center" },
-        { point = "RIGHT", label = "Right" },
-        { point = "BOTTOMLEFT", label = "Bottom left" },
-        { point = "BOTTOM", label = "Bottom" },
-        { point = "BOTTOMRIGHT", label = "Bottom right" },
-    }
+    local anchorOptions = ns.ANCHOR_POINTS
     local anchorButtons = {}
     RefreshAnchorButtons = function()
         for index, option in ipairs(anchorOptions) do
@@ -487,12 +530,21 @@ local function BuildAttachTab(configPanel, attachPage)
         end
     end)
 
-    Widgets.AddLabel(attachPage, "Frame-relative offset", 10, -286)
-    local xOffsetSlider = Widgets.AddPositionSlider(attachPage, "X offset", "x", -310, "left")
-    local yOffsetSlider = Widgets.AddPositionSlider(attachPage, "Y offset", "y", -310, "right")
+    Widgets.AddLabel(attachPage, "Offset from attach point", 10, -286)
+    local xOffsetSlider = Widgets.AddPositionSlider(attachPage, "X offset", "x", -322, "left")
+    local yOffsetSlider = Widgets.AddPositionSlider(attachPage, "Y offset", "y", -322, "right")
     RefreshOffsetControls = function()
         xOffsetSlider:RefreshPosition()
         yOffsetSlider:RefreshPosition()
+    end
+    -- Called by Tracker.lua after a drag or a position reset changes
+    -- ns.db.position or ns.db.snapToFrame, so every control that shows them
+    -- (here and the Layout tab's unlock button) is refreshed in one place.
+    configPanel.RefreshPositionControls = function()
+        RefreshAnchorButtons()
+        RefreshOffsetControls()
+        RefreshAttachmentText()
+        configPanel.RefreshUnlockText()
     end
 
     local pickerHighlight = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
@@ -501,14 +553,31 @@ local function BuildAttachTab(configPanel, attachPage)
     pickerHighlight:SetBackdropBorderColor(1, 0.82, 0, 1)
     pickerHighlight:Hide()
 
+    -- The tracker, the settings window, and anything inside them are not valid
+    -- targets: anchoring the tracker to itself is an error, and the window's
+    -- own controls are only on screen while it is open.
+    local function IsOwnFrame(frame)
+        return frame == configPanel or frame == ns.tracker or frame == pickerHighlight
+    end
+
+    -- Nearest named frame at or above the mouse focus. The whole parent chain
+    -- is walked, and IsForbidden is checked before any other method: calling
+    -- GetName or GetParent on a forbidden frame (some nameplates) is an error.
     local function GetNamedFrameUnderCursor()
         for _, focus in ipairs(GetMouseFoci()) do
-            local frame = focus
-            while frame and not frame:GetName() do
+            local frame, named, usable = focus, nil, true
+            while frame do
+                if frame:IsForbidden() or IsOwnFrame(frame) then
+                    usable = false
+                    break
+                end
+                if not named and frame:GetName() then
+                    named = frame
+                end
                 frame = frame:GetParent()
             end
-            if frame and frame ~= configPanel and frame ~= pickerHighlight then
-                return frame
+            if usable and named then
+                return named
             end
         end
     end
@@ -537,7 +606,17 @@ local function BuildAttachTab(configPanel, attachPage)
         end
         return wasPicking
     end
-    configPanel:HookScript("OnHide", configPanel.CancelFramePicker)
+    configPanel:HookScript("OnHide", function()
+        if configPanel.swallowingEscape then
+            -- Closed by Esc: key propagation must stay off until the key event
+            -- is over (see OnKeyDown), so only stop the picker here.
+            if configPanel.isPickingFrame then
+                StopFramePicker()
+            end
+        else
+            configPanel.CancelFramePicker()
+        end
+    end)
 
     pickButton:SetText("Pick frame")
     pickButton:SetScript("OnClick", function()
@@ -561,10 +640,72 @@ local function BuildAttachTab(configPanel, attachPage)
             pickerHighlight:Hide()
         end
     end)
+    local function IsPopupShown()
+        for index = 1, STATICPOPUP_NUMDIALOGS or 4 do
+            local popup = _G["StaticPopup" .. index]
+            if popup and popup:IsShown() then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- The player's own cast; pcall because cast info can be restricted.
+    local function IsCasting()
+        local ok, casting = pcall(function()
+            return (UnitCastingInfo("player") or UnitChannelInfo("player")) and true or false
+        end)
+        return ok and casting
+    end
+
+    -- True when Esc should do its normal job instead of closing this window:
+    --  * in combat, where the key can't be swallowed, so closing the window
+    --    would also open the game menu or clear the target from one press;
+    --  * while the game's Settings window or the game menu is open, so Esc
+    --    closes that one;
+    --  * while a popup (such as this addon's own confirmation) or the color
+    --    picker is open, or a spell is being cast or targeted: the game gives
+    --    all of those Esc before any window.
+    local function EscapeBelongsElsewhere()
+        return InCombatLockdown()
+            or (SettingsPanel and SettingsPanel:IsShown())
+            or (GameMenuFrame and GameMenuFrame:IsShown())
+            or IsPopupShown()
+            or (ColorPickerFrame and ColorPickerFrame:IsShown())
+            or SpellIsTargeting()
+            or IsCasting()
+    end
+
     configPanel:EnableKeyboard(true)
     configPanel:SetPropagateKeyboardInput(true)
     configPanel:SetScript("OnKeyDown", function(self, key)
         if not configPanel.isPickingFrame then
+            -- Esc closes this window, handled here rather than through
+            -- UISpecialFrames: WoW closes all of those frames together, which
+            -- closed this window whenever the game's Settings window closed.
+            -- Esc is left alone, and this window stays open, whenever the
+            -- key belongs to something else first (see EscapeBelongsElsewhere).
+            if key ~= "ESCAPE" or EscapeBelongsElsewhere() then
+                return
+            end
+            -- An open dropdown list takes Esc first; the window stays open,
+            -- so OnKeyUp restores key propagation.
+            if Widgets.CloseOpenDropdown() then
+                self:SetPropagateKeyboardInput(false)
+                return
+            end
+            -- Swallow the key so it doesn't also open the game menu. A
+            -- hidden frame gets no OnKeyUp, so propagation is restored on
+            -- the next frame (or by CancelFramePicker if combat starts first).
+            self:SetPropagateKeyboardInput(false)
+            configPanel.swallowingEscape = true
+            C_Timer.After(0, function()
+                configPanel.swallowingEscape = false
+                if not InCombatLockdown() and not configPanel:GetPropagateKeyboardInput() then
+                    configPanel:SetPropagateKeyboardInput(true)
+                end
+            end)
+            self:Hide()
             return
         end
         if key == "ESCAPE" then
@@ -581,9 +722,7 @@ local function BuildAttachTab(configPanel, attachPage)
                 ns.db.position.x = 0
                 ns.db.position.y = 0
                 ns.db.snapToFrame = true
-                ns.tracker.isUnlocked = false
-                ns.tracker:EnableMouse(false)
-                configPanel.RefreshUnlockText()
+                ns.SetTrackerUnlocked(false)
                 RefreshOffsetControls()
                 ns.ApplyLayout()
                 ns.UpdateTracker()
@@ -611,17 +750,23 @@ local function BuildPreviewSection(configPanel)
     preview:SetBackdrop({ edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     preview:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
+    -- The active count of "full" and "partial", and the "partial" label, are
+    -- filled in from the character's real maximum on every redraw.
+    local PREVIEW_POINTS = #ns.DEFAULTS.pointColors
     local previewStates = {
-        { label = "Full", active = 5, y = 34 },
-        { label = "2 / 5", active = 2, y = 0 },
-        { label = "Empty", active = 0, y = -34 },
+        { kind = "full", label = "Full", y = 34 },
+        { kind = "partial", y = 0 },
+        { kind = "empty", label = "Empty", active = 0, y = -34 },
     }
+    local function PreviewPointCount()
+        return math.min(ns.GetMaxPoints(), PREVIEW_POINTS)
+    end
     for _, state in ipairs(previewStates) do
         state.labelFrame = preview:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
         state.labelFrame:SetPoint("LEFT", preview, "LEFT", 8, state.y)
-        state.labelFrame:SetText(state.label)
+        state.labelFrame:SetText(state.label or "")
         state.points = {}
-        for index = 1, 5 do
+        for index = 1, PREVIEW_POINTS do
             state.points[index] = ns.CreatePointFrame(preview)
         end
         state.counter = ns.CreateCounterText(preview)
@@ -629,13 +774,15 @@ local function BuildPreviewSection(configPanel)
 
     -- Room for the points next to the labels, and the width of the points at full size.
     local function PreviewWidths(db)
-        local fullWidth = (math.min(db.pointWidth, 32) * 5) + (math.min(db.spacing, 8) * 4)
+        local pointCount = PreviewPointCount()
+        local fullWidth = (math.min(db.pointWidth, 32) * pointCount) + (math.min(db.spacing, 8) * (pointCount - 1))
         return preview:GetWidth() - 88, fullWidth
     end
 
     local previewScaled = false
     local function UpdateConfigPreview()
         local db = ns.db
+        local pointCount = PreviewPointCount()
         local maxWidth, totalWidth = PreviewWidths(db)
         local pointWidth = math.min(db.pointWidth, 32)
         local pointHeight = math.min(db.pointHeight, 22)
@@ -647,16 +794,26 @@ local function BuildPreviewSection(configPanel)
             pointWidth = pointWidth * scale
             pointHeight = pointHeight * scale
             spacing = spacing * scale
-            totalWidth = (pointWidth * 5) + (spacing * 4)
+            totalWidth = (pointWidth * pointCount) + (spacing * (pointCount - 1))
         end
 
         local counterFontSize = math.max(6, math.min(db.counterFontSize, 22) * scale)
         local counterX = 78 + (totalWidth / 2) + (db.counterOffsetX * scale)
 
-        local borderInset = db.showBorder and math.min(db.borderSize, math.floor(math.min(pointWidth, pointHeight) / 3)) or 0
+        pointWidth = ns.SnapToPixels(pointWidth, preview, 1)
+        pointHeight = ns.SnapToPixels(pointHeight, preview, 1)
+        local borderInset = ns.GetBorderInset(db, pointWidth, pointHeight, preview)
+        spacing = ns.SnapToPixels(spacing, preview)
         local isRound = db.shape == "round"
         for _, state in ipairs(previewStates) do
+            if state.kind == "full" then
+                state.active = pointCount
+            elseif state.kind == "partial" then
+                state.active = math.min(2, pointCount)
+                state.labelFrame:SetText(state.active .. " / " .. pointCount)
+            end
             for index, point in ipairs(state.points) do
+                point:SetShown(index <= pointCount)
                 point:SetSize(pointWidth, pointHeight)
                 ns.StylePointFrame(point, db, borderInset, isRound)
                 ns.SetPointVisual(point, index <= state.active, index)
@@ -670,7 +827,7 @@ local function BuildPreviewSection(configPanel)
             end
 
             ns.StyleCounterText(state.counter, db, counterFontSize)
-            state.counter:SetText(ns.FormatCounterText(db, state.active, 5))
+            state.counter:SetText(ns.FormatCounterText(db, state.active, pointCount))
             state.counter:SetShown(ns.ShouldShowCounter(db, state.active))
             state.counter:ClearAllPoints()
             state.counter:SetPoint("CENTER", preview, "LEFT", counterX, state.y + (db.counterOffsetY * scale))
@@ -694,8 +851,8 @@ end
 -- Panel frame itself: chrome, tabs/pages, wires the sections above together
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 520, 670
-local MIN_WIDTH, MIN_HEIGHT = 500, 670
-local MAX_WIDTH, MAX_HEIGHT = 900, 900
+local MIN_WIDTH, MAX_WIDTH = unpack(ns.NUMBER_LIMITS.width)
+local MIN_HEIGHT, MAX_HEIGHT = unpack(ns.NUMBER_LIMITS.height)
 
 local function ApplyConfigGeometry()
     local size = ns.db.configSize
@@ -738,7 +895,11 @@ function ns.CreateConfigPanel()
         self:StopMovingOrSizing()
         SaveConfigGeometry()
     end)
-    configPanel:SetFrameStrata("DIALOG")
+    -- Below DIALOG, so confirmation popups and the color picker open on top of it.
+    configPanel:SetFrameStrata("HIGH")
+    -- Deliberately not in UISpecialFrames: WoW closes every frame listed there
+    -- together, so closing the game's Settings window would close this one too.
+    -- Esc is handled in the window's own OnKeyDown (BuildAttachTab) instead.
     configPanel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
     configPanel:SetBackdropColor(0, 0, 0, 0.95)
 

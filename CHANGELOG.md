@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.0
+
+- Add a **Strata** control to the Layout tab: `-` and `+` move the tracker down or up through the UI layers (Background, Low, Medium, High, Dialog) when it ends up behind or in front of other frames. Default is Medium, as before.
+- Every slider has `-` and `+` buttons that change the value 1 step at a time (in the Attach tab they move the tracker 1 unit), and the number boxes no longer sit on top of their sliders.
+- **Border thickness** now counts screen pixels, so every step of the slider adds exactly one pixel instead of jumping unevenly.
+- Fix borders getting thicker and thinner as the tracker is moved: point size, spacing, border thickness, and position are now rounded to whole screen pixels, and the tracker's edges are aligned to the pixel grid.
+- Fix **Only show in combat** not showing the tracker until the first resource change after combat started.
+- Fix the tracker staying in the wrong place when the frame it is attached to is created after login (for example by another addon); it now re-attaches once that frame exists, also when the frame only appears some time after login.
+- Fix a thick border covering the whole point on the tracker while the preview looked fine; both now cap the border at a third of the point's smaller side.
+- Fix the point count not updating when a talent changes the maximum (for example Deeper Stratagem) until the next resource change.
+- Fix the Layout tab's unlock button showing the wrong state after `/cop unlock` or `/cop lock`.
+- Profiles are now exported as JSON. Import reads JSON and still accepts strings exported by earlier versions.
+- Importing a profile string now validates every setting, so a damaged or hand-edited string can no longer break the addon at login.
+- The frame picker no longer accepts the tracker itself or the settings window's own controls, and an attachment WoW refuses falls back to the default position instead of raising an error.
+- Every reset now asks for confirmation: Reset all defaults, both Reset position buttons, `/cop reset`, `/cop resetpos`, and `/cop resetconfigpos`. So do Copy selected profile and Import.
+- Fix negative X/Y offsets in the Attach tab ending up 1 lower than the number typed.
+- The Colors tab and the preview now follow the character's real point count as the game reports it: 4 for Arcane Mages, 6 or 7 for rogues with Deeper Stratagem / Secret Stratagem. Points 6 and 7 get their own colors in Individual mode, default green.
+- The Attach tab's offset boxes accept any on-screen value and update after you drag the tracker.
+- While unlocked, the tracker only catches the mouse over its visible points.
+- `Esc` closes the settings window, and Combo Points is listed in the minimap addon menu. `Esc` first closes an open dropdown list. `Esc` keeps its normal job, and the window stays open, in combat, while the game's Settings window, the game menu, a popup, or the color picker is open, and while a spell is being cast or targeted.
+- A tracker position that leaves no point on screen (for example from an imported profile, or while the frame it is attached to does not exist) is shown at the default position instead of being invisible.
+- Fix an error when hovering a protected frame, such as some nameplates, while picking a frame in the Attach tab.
+- Resetting the position now also updates the Attach tab's "Attached to" text and the unlock button, whichever way the reset was started.
+- Lower CPU use: the tracker now updates only when its own resource changes, and fonts already found are cached.
+- Replace the deprecated dropdown template with the addon's own dropdown button.
+
 ## 1.2.4
 
 - Fix the settings window growing on the first click of its resize grip, before you drag.

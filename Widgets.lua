@@ -37,25 +37,65 @@ local function CreateBareSlider(parent, label, column, y, minValue, maxValue, st
     return slider
 end
 
-function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, column)
+-- Gap between the bottom of a value box and the top of its slider. The
+-- slider's thumb is taller than the slider itself, so a box sitting directly
+-- on the slider made a click on the box grab the thumb instead.
+local VALUE_BOX_GAP = 8
+
+-- The "-", number box, "+" row above the right end of a slider: the buttons
+-- step by one, the box takes an exact value. Shared by every slider.
+local function CreateStepControls(parent, slider)
+    local plusButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    plusButton:SetSize(22, 22)
+    plusButton:SetPoint("BOTTOMRIGHT", slider, "TOPRIGHT", 0, VALUE_BOX_GAP)
+    plusButton:SetText("+")
+
+    local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+    input:SetSize(48, 22)
+    input:SetPoint("RIGHT", plusButton, "LEFT", -4, 0)
+    input:SetAutoFocus(false)
+    input:SetJustifyH("CENTER")
+
+    local minusButton = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    minusButton:SetSize(22, 22)
+    minusButton:SetPoint("RIGHT", input, "LEFT", -8, 0)
+    minusButton:SetText("-")
+
+    return minusButton, input, plusButton
+end
+
+-- The range comes from ns.NUMBER_LIMITS (Core.lua), which profile validation
+-- also uses, so a slider and the saved value can never disagree.
+function Widgets.AddSlider(parent, label, key, y, step, column)
+    local minValue, maxValue = unpack(ns.NUMBER_LIMITS[key])
     local slider = CreateBareSlider(parent, label, column or "full", y, minValue, maxValue, step)
-    local valueInput = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-    valueInput:SetSize(46, 20)
-    valueInput:SetPoint("TOPRIGHT", slider, "TOPRIGHT", 0, 20)
-    valueInput:SetAutoFocus(false)
-    valueInput:SetNumeric(minValue >= 0)
+    local minusButton, valueInput, plusButton = CreateStepControls(parent, slider)
+
+    local function Sync()
+        local value = ns.db[key]
+        valueInput:SetText(string.format("%.0f", value))
+        minusButton:SetEnabled(value > minValue)
+        plusButton:SetEnabled(value < maxValue)
+    end
+
     valueInput:SetScript("OnEnterPressed", function(self)
         local value = tonumber(self:GetText())
         if value then
             slider:SetValue(math.max(minValue, math.min(maxValue, value)))
-        else
-            self:SetText(string.format("%.0f", ns.db[key]))
         end
+        Sync()
         self:ClearFocus()
     end)
     valueInput:SetScript("OnEscapePressed", function(self)
-        self:SetText(string.format("%.0f", ns.db[key]))
+        Sync()
         self:ClearFocus()
+    end)
+    -- The slider clamps to its own range and OnValueChanged stores the value.
+    minusButton:SetScript("OnClick", function()
+        slider:SetValue(ns.db[key] - step)
+    end)
+    plusButton:SetScript("OnClick", function()
+        slider:SetValue(ns.db[key] + step)
     end)
 
     slider:SetValue(ns.db[key])
@@ -63,52 +103,72 @@ function Widgets.AddSlider(parent, label, key, y, minValue, maxValue, step, colu
     slider:SetScript("OnValueChanged", function(_, value)
         value = math.floor((value / step) + 0.5) * step
         ns.db[key] = value
-        valueInput:SetText(string.format("%.0f", value))
+        Sync()
         ns.ApplyLayout()
         ns.UpdateTracker()
     end)
-    valueInput:SetText(string.format("%.0f", ns.db[key]))
+    Sync()
     return slider
 end
 
+local POSITION_SLIDER_RANGE = 500
+
+-- Offset control for ns.db.position.x / .y: a slider for coarse moves, -/+
+-- buttons for single steps, and a box for exact values. The slider only spans
+-- +-POSITION_SLIDER_RANGE so dragging it stays precise; the box and buttons
+-- accept anything on screen, and the slider then just rests at its end.
 function Widgets.AddPositionSlider(parent, label, key, y, column)
-    local slider = CreateBareSlider(parent, label, column, y, -500, 500, 1)
-    local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-    input:SetSize(54, 22)
-    input:SetPoint("TOPRIGHT", slider, "TOPRIGHT", 0, 22)
-    input:SetAutoFocus(false)
-    input:SetText(string.format("%d", ns.db.position[key]))
-    slider:SetValue(ns.db.position[key])
+    local slider = CreateBareSlider(parent, label, column, y, -POSITION_SLIDER_RANGE, POSITION_SLIDER_RANGE, 1)
+
+    local minusButton, input, plusButton = CreateStepControls(parent, slider)
+
+    -- Shows the stored value. The slider is clamped to its own range, and the
+    -- flag stops that clamped value from being written back as the position.
+    local syncing = false
+    local function Sync()
+        local value = ns.db.position[key]
+        syncing = true
+        slider:SetValue(math.max(-POSITION_SLIDER_RANGE, math.min(POSITION_SLIDER_RANGE, value)))
+        syncing = false
+        input:SetText(string.format("%d", value))
+    end
 
     local function SetPosition(value)
-        value = math.max(-500, math.min(500, math.floor(value + (value >= 0 and 0.5 or -0.5))))
+        -- Read on every change: the screen's size in UI units follows the UI scale.
+        local limit = math.max(POSITION_SLIDER_RANGE, math.ceil(math.max(UIParent:GetWidth(), UIParent:GetHeight())))
+        value = math.max(-limit, math.min(limit, math.floor(value + 0.5)))
         ns.db.position[key] = value
-        input:SetText(string.format("%d", value))
+        Sync()
         ns.ApplyLayout()
         ns.UpdateTracker()
     end
 
     slider:SetScript("OnValueChanged", function(_, value)
-        SetPosition(value)
+        if not syncing then
+            SetPosition(value)
+        end
+    end)
+    minusButton:SetScript("OnClick", function()
+        SetPosition(ns.db.position[key] - 1)
+    end)
+    plusButton:SetScript("OnClick", function()
+        SetPosition(ns.db.position[key] + 1)
     end)
     input:SetScript("OnEnterPressed", function(self)
         local value = tonumber(self:GetText())
         if value then
-            value = math.max(-500, math.min(500, value))
-            slider:SetValue(value)
+            SetPosition(value)
         else
-            self:SetText(string.format("%d", ns.db.position[key]))
+            Sync()
         end
         self:ClearFocus()
     end)
     input:SetScript("OnEscapePressed", function(self)
-        self:SetText(string.format("%d", ns.db.position[key]))
+        Sync()
         self:ClearFocus()
     end)
-    slider.RefreshPosition = function()
-        input:SetText(string.format("%d", ns.db.position[key]))
-        slider:SetValue(ns.db.position[key])
-    end
+    slider.RefreshPosition = Sync
+    Sync()
     return slider
 end
 
@@ -182,18 +242,42 @@ end
 local DROPDOWN_ROW_HEIGHT = 20
 local DROPDOWN_LIST_HEIGHT = 180
 
-local function GetDropDownRegion(frame, suffix)
-    return frame[suffix] or _G[frame:GetName() .. suffix]
+local DROPDOWN_HEIGHT = 26
+
+-- The closed dropdown is an addon-owned button rather than Blizzard's
+-- UIDropDownMenuTemplate, which has been deprecated since 11.0.
+-- The dropdown list that is open, if any, so Esc can close it before the
+-- settings window (ConfigPanel.lua OnKeyDown).
+local openDropdownList
+
+-- Returns true if a list was open.
+function Widgets.CloseOpenDropdown()
+    if openDropdownList then
+        openDropdownList:Hide()
+        return true
+    end
+    return false
 end
 
-function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
-    local dropdown = CreateFrame("Frame", name, parent, "UIDropDownMenuTemplate")
+function Widgets.AddScrollableDropdown(parent, x, y, width, config)
+    local dropdown = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    dropdown:SetSize(width, DROPDOWN_HEIGHT)
     dropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    UIDropDownMenu_SetWidth(dropdown, width)
+    dropdown:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    dropdown:SetBackdropColor(0, 0, 0, 0.6)
+    dropdown:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    dropdown:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
 
-    local leftRegion = GetDropDownRegion(dropdown, "Left") or dropdown
-    local rightRegion = GetDropDownRegion(dropdown, "Right") or dropdown
-    local arrowButton = GetDropDownRegion(dropdown, "Button")
+    local arrow = dropdown:CreateTexture(nil, "ARTWORK")
+    arrow:SetSize(18, 18)
+    arrow:SetPoint("RIGHT", dropdown, "RIGHT", -5, 0)
+    arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+
+    local selectedText = dropdown:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    selectedText:SetPoint("LEFT", dropdown, "LEFT", 8, 0)
+    selectedText:SetPoint("RIGHT", arrow, "LEFT", -4, 0)
+    selectedText:SetJustifyH("LEFT")
+    selectedText:SetWordWrap(false)
 
     local list = CreateFrame("Frame", nil, dropdown, "BackdropTemplate")
     list:SetHeight(DROPDOWN_LIST_HEIGHT)
@@ -203,6 +287,17 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
     list:SetBackdropColor(0, 0, 0, 0.95)
     list:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     list:Hide()
+    list:SetScript("OnShow", function(self)
+        if openDropdownList and openDropdownList ~= self then
+            openDropdownList:Hide()
+        end
+        openDropdownList = self
+    end)
+    list:SetScript("OnHide", function(self)
+        if openDropdownList == self then
+            openDropdownList = nil
+        end
+    end)
 
     local scrollFrame = CreateFrame("ScrollFrame", nil, list, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", list, "TOPLEFT", 8, -8)
@@ -225,11 +320,11 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
 
         list:ClearAllPoints()
         if openUpward then
-            list:SetPoint("BOTTOMLEFT", leftRegion, "TOPLEFT", 0, -6)
-            list:SetPoint("BOTTOMRIGHT", rightRegion, "TOPRIGHT", 0, -6)
+            list:SetPoint("BOTTOMLEFT", dropdown, "TOPLEFT", 0, 2)
+            list:SetPoint("BOTTOMRIGHT", dropdown, "TOPRIGHT", 0, 2)
         else
-            list:SetPoint("TOPLEFT", leftRegion, "BOTTOMLEFT", 0, 6)
-            list:SetPoint("TOPRIGHT", rightRegion, "BOTTOMRIGHT", 0, 6)
+            list:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 0, -2)
+            list:SetPoint("TOPRIGHT", dropdown, "BOTTOMRIGHT", 0, -2)
         end
     end
 
@@ -297,14 +392,7 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
         list:Show()
     end
 
-    if arrowButton then
-        arrowButton:SetScript("OnClick", Toggle)
-    end
-
-    local clickCatcher = CreateFrame("Button", nil, dropdown)
-    clickCatcher:SetPoint("TOPLEFT", leftRegion, "TOPLEFT", 0, 0)
-    clickCatcher:SetPoint("BOTTOMRIGHT", rightRegion, "BOTTOMRIGHT", 0, 0)
-    clickCatcher:SetScript("OnClick", Toggle)
+    dropdown:SetScript("OnClick", Toggle)
 
     parent:HookScript("OnHide", function()
         list:Hide()
@@ -312,22 +400,23 @@ function Widgets.AddScrollableDropdown(parent, name, x, y, width, config)
 
     local picker = { frame = dropdown, list = list }
     function picker:SetWidth(newWidth)
-        UIDropDownMenu_SetWidth(dropdown, newWidth)
+        dropdown:SetWidth(newWidth)
     end
     function picker:Refresh()
-        UIDropDownMenu_SetText(dropdown, config.GetDisplayName(config.GetValue()))
+        selectedText:SetText(config.GetDisplayName(config.GetValue()))
         if list:IsShown() then
             RebuildRows()
         end
     end
     function picker:SetEnabled(enabled)
+        dropdown:SetEnabled(enabled)
+        arrow:SetDesaturated(not enabled)
         if enabled then
-            UIDropDownMenu_EnableDropDown(dropdown)
+            selectedText:SetTextColor(1, 1, 1)
         else
-            UIDropDownMenu_DisableDropDown(dropdown)
+            selectedText:SetTextColor(0.5, 0.5, 0.5)
             list:Hide()
         end
-        clickCatcher:SetEnabled(enabled)
     end
     return picker
 end

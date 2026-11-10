@@ -2,10 +2,11 @@
 ## Title: Combo Points
 ## Notes: Customizable tracker for Combo Points and other point-based resources.
 ## Author: iMatMan
-## Version: 1.2.3
+## Version: @project-version@
 ## X-Curse-Project-ID: 1643324
 ## SavedVariables: ComboPointsDB
 ## IconTexture: Interface\AddOns\ComboPoints\icon.tga
+## AddonCompartmentFunc: ComboPoints_OnAddonCompartmentClick
 ## Category: Unit Frames
 ## Category-deDE: Einheitenfenster
 ## Category-frFR: Fenêtres d’unités

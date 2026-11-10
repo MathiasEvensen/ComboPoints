@@ -7,24 +7,78 @@ local function GetCharacterKey()
     return (realm or GetRealmName() or "Unknown") .. " - " .. (name or UnitName("player") or "Unknown")
 end
 
+-- Profile validation. Every profile that becomes ns.db (saved, copied, or
+-- imported) is rebuilt from ns.DEFAULTS: a key is kept only when its type
+-- matches the default, numbers are clamped to ns.NUMBER_LIMITS (Core.lua), anchor
+-- points and strata must be real ones, and unknown keys are dropped. A
+-- wrong type would otherwise raise an error in the layout code at every login.
+
+local VALID_ANCHOR_POINTS = {}
+for _, anchor in ipairs(ns.ANCHOR_POINTS) do
+    VALID_ANCHOR_POINTS[anchor.point] = true
+end
+local VALID_STRATA = {}
+for _, level in ipairs(ns.STRATA_LEVELS) do
+    VALID_STRATA[level.value] = true
+end
+-- String settings that only accept a fixed set of values.
+local STRING_CHOICES = { point = VALID_ANCHOR_POINTS, relativePoint = VALID_ANCHOR_POINTS, strata = VALID_STRATA }
+
+local function SanitizeInto(defaults, source, target)
+    for key, default in pairs(defaults) do
+        local value = source[key]
+        local valueType = type(value)
+        if valueType == type(default) then
+            if valueType == "table" then
+                target[key] = {}
+                SanitizeInto(default, value, target[key])
+            elseif valueType == "number" then
+                -- Rejects NaN and infinity.
+                if value == value and value ~= math.huge and value ~= -math.huge then
+                    local limits = ns.NUMBER_LIMITS[key]
+                    if limits then
+                        value = math.max(limits[1], math.min(limits[2], value))
+                    end
+                    target[key] = value
+                end
+            elseif valueType ~= "string" or not STRING_CHOICES[key] or STRING_CHOICES[key][value] then
+                target[key] = value
+            end
+        end
+    end
+end
+
+function ns.SanitizeProfile(source)
+    local db = {}
+    if type(source) == "table" then
+        SanitizeInto(ns.DEFAULTS, source, db)
+    end
+    ns.CopyDefaults(ns.DEFAULTS, db)
+    return db
+end
+
+local function AdoptProfile(source)
+    ns.db = ns.SanitizeProfile(source)
+    ComboPointsDB.profiles[ns.currentCharacterKey] = ns.db
+end
+
 function ns.LoadCharacterProfile()
     ns.currentCharacterKey = GetCharacterKey()
     ns.classFile = select(2, UnitClass("player"))
-    ComboPointsDB = ComboPointsDB or {}
-    if not ComboPointsDB.profiles then
+    ns.activePowerType, ns.activePowerToken = ns.GetPowerType(ns.classFile)
+    if type(ComboPointsDB) ~= "table" then
+        ComboPointsDB = {}
+    end
+    if type(ComboPointsDB.profiles) ~= "table" then
         local legacySettings = ns.CopyTable(ComboPointsDB)
         ComboPointsDB = { version = 2, profiles = { [ns.currentCharacterKey] = legacySettings } }
     end
 
-    ns.db = ComboPointsDB.profiles[ns.currentCharacterKey] or {}
-    ComboPointsDB.profiles[ns.currentCharacterKey] = ns.db
-    ns.CopyDefaults(ns.DEFAULTS, ns.db)
+    AdoptProfile(ComboPointsDB.profiles[ns.currentCharacterKey])
 end
 
 function ns.ResetCurrentProfile()
-    ns.db = {}
-    ComboPointsDB.profiles[ns.currentCharacterKey] = ns.db
-    ns.CopyDefaults(ns.DEFAULTS, ns.db)
+    AdoptProfile(nil)
 end
 
 function ns.GetOtherCharacterKeys()
@@ -40,80 +94,392 @@ end
 
 function ns.CopyProfileToCurrent(sourceKey)
     local source = ComboPointsDB.profiles[sourceKey]
-    if not source then
+    if type(source) ~= "table" then
         return false
     end
-
-    local db = ns.CopyTable(source)
-    db.position = db.position or ns.CopyTable(ns.DEFAULTS.position)
-    db.snapToFrame = source.snapToFrame == true
-    db.catFormAllSpecs = source.catFormAllSpecs == true
-    ns.db = db
-    ComboPointsDB.profiles[ns.currentCharacterKey] = db
-    ns.CopyDefaults(ns.DEFAULTS, db)
+    AdoptProfile(source)
     return true
 end
 
--- Export/import: serialize a profile table to a pasteable Lua literal string and back.
--- Deserialization runs the parsed chunk in an empty sandbox
--- (setfenv to {}) so pasted text can only build a table, never touch globals.
+-- Export/import. A profile is exported as JSON text. Import reads JSON, and
+-- still reads the Lua-table text that versions before 2.0.0 exported. Both
+-- readers are small data-only parsers: they build tables, strings, numbers and
+-- booleans and nothing else. The pasted text is never compiled or run (no
+-- loadstring), so it can neither reach globals nor loop; ns.ImportProfile then
+-- validates the result against ns.DEFAULTS.
 
-local function SerializeValue(value, parts)
+local JSON_ESCAPES = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
+
+local function EncodeJsonString(value)
+    return '"' .. value:gsub('[%c"\\]', function(character)
+        return JSON_ESCAPES[character] or string.format("\\u%04x", character:byte())
+    end) .. '"'
+end
+
+-- A table whose keys are exactly 1..n (pointColors) is written as an array.
+local function IsSequence(value)
+    local count = 0
+    for _ in pairs(value) do
+        count = count + 1
+    end
+    return count > 0 and count == #value
+end
+
+local function EncodeJson(value, parts)
     local valueType = type(value)
     if valueType == "table" then
-        table.insert(parts, "{")
-        for key, entry in pairs(value) do
-            if type(key) == "number" then
-                table.insert(parts, "[" .. key .. "]=")
-            else
-                table.insert(parts, "[" .. string.format("%q", key) .. "]=")
+        if IsSequence(value) then
+            table.insert(parts, "[")
+            for index, entry in ipairs(value) do
+                if index > 1 then
+                    table.insert(parts, ",")
+                end
+                EncodeJson(entry, parts)
             end
-            SerializeValue(entry, parts)
-            table.insert(parts, ",")
+            table.insert(parts, "]")
+        else
+            -- Sorted, so the same profile always exports the same text.
+            local keys = {}
+            for key in pairs(value) do
+                table.insert(keys, tostring(key))
+            end
+            table.sort(keys)
+            table.insert(parts, "{")
+            for index, key in ipairs(keys) do
+                if index > 1 then
+                    table.insert(parts, ",")
+                end
+                table.insert(parts, EncodeJsonString(key) .. ":")
+                local entry = value[key]
+                if entry == nil then
+                    entry = value[tonumber(key)]
+                end
+                EncodeJson(entry, parts)
+            end
+            table.insert(parts, "}")
         end
-        table.insert(parts, "}")
     elseif valueType == "string" then
-        table.insert(parts, string.format("%q", value))
-    elseif valueType == "number" or valueType == "boolean" then
+        table.insert(parts, EncodeJsonString(value))
+    elseif valueType == "number" then
+        -- JSON has no NaN or infinity.
+        if value ~= value or value == math.huge or value == -math.huge then
+            table.insert(parts, "null")
+        else
+            table.insert(parts, string.format("%.14g", value))
+        end
+    elseif valueType == "boolean" then
         table.insert(parts, tostring(value))
     else
-        table.insert(parts, "nil")
+        table.insert(parts, "null")
     end
 end
 
 function ns.SerializeProfile(db)
     local parts = {}
-    SerializeValue(ns.CopyTable(db), parts)
+    EncodeJson(db, parts)
     return table.concat(parts)
 end
 
-function ns.DeserializeProfile(text)
-    if type(text) ~= "string" or text:match("^%s*$") then
-        return nil
+local MAX_IMPORT_LENGTH = 20000
+local MAX_IMPORT_DEPTH = 8
+local STRING_ESCAPES = { n = "\n", r = "\r", t = "\t", ["\\"] = "\\", ['"'] = '"', ["\n"] = "\n" }
+local JSON_UNESCAPES = { n = "\n", r = "\r", t = "\t", b = "\b", f = "\f", ["\\"] = "\\", ['"'] = '"', ["/"] = "/" }
+
+-- UTF-8 bytes for a \uXXXX code point (below 0x10000).
+local function EncodeUtf8(code)
+    if code < 0x80 then
+        return string.char(code)
+    elseif code < 0x800 then
+        return string.char(0xC0 + math.floor(code / 0x40), 0x80 + (code % 0x40))
     end
-    local chunk = loadstring("return " .. text)
-    if not chunk then
-        return nil
+    return string.char(0xE0 + math.floor(code / 0x1000), 0x80 + (math.floor(code / 0x40) % 0x40), 0x80 + (code % 0x40))
+end
+
+-- JSON reader. Raises an error on malformed text; ns.DeserializeProfile wraps
+-- it in pcall. An array becomes a table with keys 1..n. An object key that is
+-- a whole number ("3") becomes that number, since profile tables indexed by
+-- number are written as objects when they have gaps.
+local function ParseJsonText(text)
+    local position = 1
+    local ParseValue
+
+    local function SkipSpace()
+        position = text:find("%S", position) or (#text + 1)
     end
-    setfenv(chunk, {})
-    local ok, result = pcall(chunk)
-    if not ok or type(result) ~= "table" then
-        return nil
+
+    local function Peek()
+        SkipSpace()
+        return text:sub(position, position)
+    end
+
+    local function ParseString()
+        local parts = {}
+        position = position + 1
+        while true do
+            local character = text:sub(position, position)
+            if character == "" then
+                error("unterminated string")
+            elseif character == '"' then
+                position = position + 1
+                return table.concat(parts)
+            elseif character == "\\" then
+                local escape = text:sub(position + 1, position + 1)
+                if escape == "u" then
+                    local digits = text:match("^%x%x%x%x", position + 2)
+                    if not digits then
+                        error("bad unicode escape")
+                    end
+                    local code = tonumber(digits, 16)
+                    -- Surrogate halves are not characters on their own.
+                    if code >= 0xD800 and code <= 0xDFFF then
+                        error("unsupported unicode escape")
+                    end
+                    table.insert(parts, EncodeUtf8(code))
+                    position = position + 6
+                else
+                    local unescaped = JSON_UNESCAPES[escape]
+                    if not unescaped then
+                        error("bad escape")
+                    end
+                    table.insert(parts, unescaped)
+                    position = position + 2
+                end
+            else
+                table.insert(parts, character)
+                position = position + 1
+            end
+        end
+    end
+
+    local function ParseNumber()
+        local literal = text:match("^-?%d+%.?%d*[eE]?[-+]?%d*", position)
+        local number = literal and tonumber(literal)
+        if not number then
+            error("bad value")
+        end
+        position = position + #literal
+        return number
+    end
+
+    local function ParseArray(depth)
+        local result = {}
+        position = position + 1
+        if Peek() == "]" then
+            position = position + 1
+            return result
+        end
+        while true do
+            result[#result + 1] = ParseValue(depth)
+            local character = Peek()
+            position = position + 1
+            if character == "]" then
+                return result
+            elseif character ~= "," then
+                error("expected , or ]")
+            end
+        end
+    end
+
+    local function ParseObject(depth)
+        local result = {}
+        position = position + 1
+        if Peek() == "}" then
+            position = position + 1
+            return result
+        end
+        while true do
+            if Peek() ~= '"' then
+                error("expected a key")
+            end
+            local key = ParseString()
+            if Peek() ~= ":" then
+                error("expected :")
+            end
+            position = position + 1
+            if key:match("^[1-9]%d*$") then
+                key = tonumber(key)
+            end
+            result[key] = ParseValue(depth)
+            local character = Peek()
+            position = position + 1
+            if character == "}" then
+                return result
+            elseif character ~= "," then
+                error("expected , or }")
+            end
+        end
+    end
+
+    ParseValue = function(depth)
+        local character = Peek()
+        if character == "{" or character == "[" then
+            if depth >= MAX_IMPORT_DEPTH then
+                error("nested too deeply")
+            end
+            if character == "{" then
+                return ParseObject(depth + 1)
+            end
+            return ParseArray(depth + 1)
+        elseif character == '"' then
+            return ParseString()
+        end
+        for _, word in ipairs({ "true", "false", "null" }) do
+            if text:sub(position, position + #word - 1) == word then
+                position = position + #word
+                if word == "null" then
+                    return nil
+                end
+                return word == "true"
+            end
+        end
+        return ParseNumber()
+    end
+
+    local result = ParseValue(0)
+    SkipSpace()
+    if position <= #text then
+        error("trailing text")
     end
     return result
+end
+
+-- Reader for the Lua-table text exported before 2.0.0, kept so old strings
+-- still import. Raises an error on malformed text, like ParseJsonText.
+local function ParseLegacyText(text)
+    local position = 1
+    local ParseValue
+
+    local function SkipSpace()
+        position = text:find("%S", position) or (#text + 1)
+    end
+
+    local function Expect(character)
+        SkipSpace()
+        if text:sub(position, position) ~= character then
+            error("expected " .. character)
+        end
+        position = position + 1
+    end
+
+    local function ParseString()
+        local parts = {}
+        position = position + 1
+        while true do
+            local character = text:sub(position, position)
+            if character == "" then
+                error("unterminated string")
+            elseif character == '"' then
+                position = position + 1
+                return table.concat(parts)
+            elseif character == "\\" then
+                local digits = text:match("^%d%d?%d?", position + 1)
+                if digits then
+                    table.insert(parts, string.char(tonumber(digits)))
+                    position = position + 1 + #digits
+                else
+                    local escaped = STRING_ESCAPES[text:sub(position + 1, position + 1)]
+                    if not escaped then
+                        error("bad escape")
+                    end
+                    table.insert(parts, escaped)
+                    position = position + 2
+                end
+            else
+                table.insert(parts, character)
+                position = position + 1
+            end
+        end
+    end
+
+    local function ParseNumber()
+        local literal = text:match("^-?%d[%d%.]*[eE]?[-+]?%d*", position)
+        local number = literal and tonumber(literal)
+        if not number then
+            error("bad number")
+        end
+        position = position + #literal
+        return number
+    end
+
+    local function ParseTable(depth)
+        if depth > MAX_IMPORT_DEPTH then
+            error("nested too deeply")
+        end
+        local result = {}
+        position = position + 1
+        while true do
+            SkipSpace()
+            if text:sub(position, position) == "}" then
+                position = position + 1
+                return result
+            end
+            Expect("[")
+            SkipSpace()
+            local key
+            if text:sub(position, position) == '"' then
+                key = ParseString()
+            else
+                key = ParseNumber()
+            end
+            Expect("]")
+            Expect("=")
+            result[key] = ParseValue(depth)
+            SkipSpace()
+            if text:sub(position, position) == "," then
+                position = position + 1
+            elseif text:sub(position, position) ~= "}" then
+                error("expected , or }")
+            end
+        end
+    end
+
+    ParseValue = function(depth)
+        SkipSpace()
+        local character = text:sub(position, position)
+        if character == "{" then
+            return ParseTable(depth + 1)
+        elseif character == '"' then
+            return ParseString()
+        end
+        for _, word in ipairs({ "true", "false", "nil" }) do
+            if text:sub(position, position + #word - 1) == word then
+                position = position + #word
+                if word == "nil" then
+                    return nil
+                end
+                return word == "true"
+            end
+        end
+        return ParseNumber()
+    end
+
+    local result = ParseValue(0)
+    SkipSpace()
+    if position <= #text then
+        error("trailing text")
+    end
+    return result
+end
+
+function ns.DeserializeProfile(text)
+    if type(text) ~= "string" or text:match("^%s*$") or #text > MAX_IMPORT_LENGTH then
+        return nil
+    end
+    -- Current format first, then the pre-2.0.0 one. Neither runs the text.
+    for _, parse in ipairs({ ParseJsonText, ParseLegacyText }) do
+        local ok, result = pcall(parse, text)
+        if ok and type(result) == "table" then
+            return result
+        end
+    end
+    return nil
 end
 
 function ns.ImportProfile(data)
     if type(data) ~= "table" then
         return false
     end
-    local db = ns.CopyTable(data)
-    db.position = db.position or ns.CopyTable(ns.DEFAULTS.position)
-    db.snapToFrame = data.snapToFrame == true
-    db.catFormAllSpecs = data.catFormAllSpecs == true
-    ns.db = db
-    ComboPointsDB.profiles[ns.currentCharacterKey] = db
-    ns.CopyDefaults(ns.DEFAULTS, db)
+    AdoptProfile(data)
     return true
 end
 
@@ -146,21 +512,23 @@ function ns.IsTrackedClass(classFile)
     return classFile == "ROGUE" or classFile == "PALADIN" or classFile == "WARLOCK"
 end
 
+-- Returns the Enum.PowerType to read and the matching power token, which is
+-- what UNIT_POWER_FREQUENT passes as its second argument.
 function ns.GetPowerType(classFile)
     classFile = classFile or select(2, UnitClass("player"))
     if classFile == "DRUID" or classFile == "ROGUE" then
-        return Enum.PowerType.ComboPoints
+        return Enum.PowerType.ComboPoints, "COMBO_POINTS"
     end
     if classFile == "PALADIN" then
-        return Enum.PowerType.HolyPower
+        return Enum.PowerType.HolyPower, "HOLY_POWER"
     end
     if classFile == "MONK" then
-        return Enum.PowerType.Chi
+        return Enum.PowerType.Chi, "CHI"
     end
     if classFile == "WARLOCK" then
-        return Enum.PowerType.SoulShards
+        return Enum.PowerType.SoulShards, "SOUL_SHARDS"
     end
     if classFile == "MAGE" then
-        return Enum.PowerType.ArcaneCharges
+        return Enum.PowerType.ArcaneCharges, "ARCANE_CHARGES"
     end
 end

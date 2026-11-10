@@ -15,6 +15,10 @@ ns.DEFAULTS = {
         [3] = { r = 1, g = 0.82, b = 0, a = 1 },
         [4] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
         [5] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
+        -- Only reachable when the game reports a maximum above 5, for example
+        -- rogues with Deeper Stratagem / Secret Stratagem.
+        [6] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
+        [7] = { r = 0.1, g = 0.9, b = 0.2, a = 1 },
     },
     emptyColor = { r = 0.07450980693101883, g = 0.07450980693101883, b = 0.07450980693101883, a = 0.3046874403953552 },
     showBackground = true,
@@ -35,10 +39,60 @@ ns.DEFAULTS = {
     configPosition = { point = "TOPLEFT", relativePoint = "CENTER", x = -260, y = 305 },
     configSize = { width = 520, height = 670 },
     snapToFrame = false,
+    strata = "MEDIUM",
     onlyInCombat = false,
     onlySupportedSpecs = true,
     catFormAllSpecs = false,
     enabled = true,
+}
+
+-- Allowed range of every numeric setting, keyed by the setting's own name
+-- wherever it sits in the profile. The one source for both the sliders
+-- (Widgets.AddSlider) and profile validation (ns.SanitizeProfile). x/y cover
+-- the tracker position and the settings window position; the bound is far
+-- wider than any screen, so it only rejects garbage and never changes an
+-- offset a player set, including an offset from an attached frame.
+ns.NUMBER_LIMITS = {
+    pointWidth = { 8, 100 },
+    pointHeight = { 8, 100 },
+    spacing = { 0, 50 },
+    borderSize = { 1, 8 },
+    counterFontSize = { 6, 48 },
+    counterOffsetX = { -200, 200 },
+    counterOffsetY = { -200, 200 },
+    x = { -10000, 10000 },
+    y = { -10000, 10000 },
+    width = { 500, 900 },
+    height = { 670, 900 },
+    r = { 0, 1 },
+    g = { 0, 1 },
+    b = { 0, 1 },
+    a = { 0, 1 },
+}
+
+-- The nine anchor points, in the Attach tab's button order (rows of three).
+-- Also the set profile validation accepts for position.point/relativePoint.
+ns.ANCHOR_POINTS = {
+    { point = "TOPLEFT", label = "Top left" },
+    { point = "TOP", label = "Top" },
+    { point = "TOPRIGHT", label = "Top right" },
+    { point = "LEFT", label = "Left" },
+    { point = "CENTER", label = "Center" },
+    { point = "RIGHT", label = "Right" },
+    { point = "BOTTOMLEFT", label = "Bottom left" },
+    { point = "BOTTOM", label = "Bottom" },
+    { point = "BOTTOMRIGHT", label = "Bottom right" },
+}
+
+-- Frame strata the tracker can be drawn in, lowest first. MEDIUM is what a
+-- plain frame gets; the levels above DIALOG are left out so the tracker can't
+-- cover fullscreen UI and tooltips.
+ns.STRATA_LEVELS = {
+    { value = "BACKGROUND", label = "Background" },
+    { value = "LOW", label = "Low" },
+    { value = "MEDIUM", label = "Medium" },
+    { value = "HIGH", label = "High" },
+    { value = "DIALOG", label = "Dialog" },
 }
 
 -- Shared mutable state, populated by other addon files as they load and run.
@@ -47,8 +101,17 @@ ns.tracker = nil
 ns.configPanel = nil
 ns.pointFrames = {}
 ns.activePowerType = nil
+ns.activePowerToken = nil
 ns.currentCharacterKey = nil
 ns.classFile = nil
+-- Combat state is tracked from PLAYER_REGEN_DISABLED/ENABLED (Bindings.lua)
+-- instead of InCombatLockdown(), which is still false while the
+-- PLAYER_REGEN_DISABLED handlers run.
+ns.inCombat = false
+-- True while the profile is attached to a frame that does not exist yet (for
+-- example one another addon creates later); the layout is retried from
+-- Bindings.lua (events) and Tracker.lua (timer).
+ns.attachmentPending = false
 
 -- Replaced with the real refresher once the config panel builds its live
 -- preview (ConfigPanel.lua BuildPreviewSection); a no-op until then so
@@ -105,8 +168,15 @@ function ns.TrySetFont(fontString, path, size, flags)
 end
 
 local fontTester
+-- Font paths already confirmed to load, keyed by lower-case path. Only
+-- successes are remembered: a font can fail its first probe (the list is first
+-- built at login, before the client has loaded the file) and pass a later one,
+-- so a failed font is probed again on every call instead of being cached as
+-- missing.
+local confirmedFonts = {}
 
 function ns.GetAvailableFonts()
+    local sharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
     fontTester = fontTester or UIParent:CreateFontString(nil, "BACKGROUND", "GameFontNormal")
 
     local fonts = { { name = "Default", path = "" } }
@@ -115,8 +185,10 @@ function ns.GetAvailableFonts()
         if not path or path == "" or seen[path:lower()] then
             return
         end
-        if ns.TrySetFont(fontTester, path, 12, "") then
-            seen[path:lower()] = true
+        local key = path:lower()
+        if confirmedFonts[key] or ns.TrySetFont(fontTester, path, 12, "") then
+            confirmedFonts[key] = true
+            seen[key] = true
             table.insert(fonts, { name = name, path = path })
         end
     end
@@ -125,7 +197,6 @@ function ns.GetAvailableFonts()
         AddFont(candidate.name, candidate.path)
     end
 
-    local sharedMedia = LibStub and LibStub("LibSharedMedia-3.0", true)
     if sharedMedia then
         for _, name in ipairs(sharedMedia:List("font")) do
             AddFont(name, sharedMedia:Fetch("font", name, true))
@@ -147,8 +218,34 @@ function ns.GetFontDisplayName(path)
     return path:match("([^\\/]+)$") or path
 end
 
+-- Returns the named frame, or nil when no usable frame has that name (yet).
 function ns.GetAttachmentFrame(frameName)
-    return (frameName and _G[frameName]) or UIParent
+    local frame = frameName and _G[frameName]
+    if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" then
+        return nil
+    end
+    if frame:IsForbidden() then
+        return nil
+    end
+    return frame
+end
+
+-- Yes/no prompt for actions that overwrite the profile or reload the UI.
+StaticPopupDialogs["COMBOPOINTS_CONFIRM"] = {
+    text = "%s",
+    button1 = ACCEPT,
+    button2 = CANCEL,
+    OnAccept = function(_, onAccept)
+        onAccept()
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+
+function ns.Confirm(text, onAccept)
+    StaticPopup_Show("COMBOPOINTS_CONFIRM", text, nil, onAccept)
 end
 
 function ns.CopyDefaults(source, target)

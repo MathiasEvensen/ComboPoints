@@ -13,23 +13,26 @@ SlashCmdList.COMBOPOINTS = function(message)
             print("Combo Points: detach from frame before free-moving tracker.")
             return
         end
-        ns.tracker.isUnlocked = true
-        ns.tracker:EnableMouse(true)
+        ns.SetTrackerUnlocked(true)
         print("Combo Points: position unlocked. Drag tracker, then use /cop lock.")
     elseif message == "lock" then
-        ns.tracker.isUnlocked = false
-        ns.tracker:EnableMouse(false)
+        ns.SetTrackerUnlocked(false)
         print("Combo Points: position locked.")
     elseif message == "resetpos" or message == "resetposition" then
-        ns.ResetPosition()
-        print("Combo Points: position reset.")
+        ns.Confirm("Reset the tracker position and detach it from its frame?", function()
+            ns.ResetPosition()
+            print("Combo Points: position reset.")
+        end)
     elseif message == "resetconfigpos" or message == "resetconfigposition" then
-        ns.ResetConfigPosition()
-        print("Combo Points: settings window position and size reset.")
+        ns.Confirm("Reset the settings window's position and size?", function()
+            ns.ResetConfigPosition()
+            print("Combo Points: settings window position and size reset.")
+        end)
     elseif message == "reset" then
-        ns.ResetCurrentProfile()
-        print("Combo Points: defaults restored.")
-        C_UI.Reload()
+        ns.Confirm("Reset all Combo Points settings for this character to defaults? This reloads the UI.", function()
+            ns.ResetCurrentProfile()
+            C_UI.Reload()
+        end)
     elseif message == "toggle" or message == "on" or message == "off" then
         ns.db.enabled = message == "off" and false or (message == "on" or not ns.db.enabled)
         ns.UpdateTracker()
@@ -39,16 +42,25 @@ SlashCmdList.COMBOPOINTS = function(message)
     end
 end
 
-ns.addon:SetScript("OnEvent", function(_, event, unit)
+-- Addon compartment (minimap addon menu) entry, named in ComboPoints.toc.
+function ComboPoints_OnAddonCompartmentClick()
+    if ns.configPanel then
+        ToggleConfig()
+    end
+end
+
+ns.addon:SetScript("OnEvent", function(_, event, unit, powerToken)
     if event == "ADDON_LOADED" then
-        local loadedAddon = unit
-        if loadedAddon ~= ADDON_NAME then
-            return
+        -- Another addon may have just created the frame the tracker is attached to.
+        if ns.attachmentPending and ns.tracker then
+            ns.ApplyLayout()
         end
         return
     end
 
     if event == "PLAYER_LOGIN" then
+        -- A reload in the middle of a fight gets no PLAYER_REGEN_DISABLED.
+        ns.inCombat = (InCombatLockdown() or UnitAffectingCombat("player")) and true or false
         ns.LoadCharacterProfile()
         ns.CreateTracker()
         ns.CreateConfigPanel()
@@ -56,13 +68,27 @@ ns.addon:SetScript("OnEvent", function(_, event, unit)
         return
     end
 
-    if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" then
-        if unit ~= "player" then
-            return
-        end
+    -- Fires for every power type (energy and mana tick constantly); only the
+    -- tracked resource matters. Same event and tokens as Blizzard's own class
+    -- power bars (Blizzard_UnitFrame ClassPowerBar.lua and its XML, 12.1.5).
+    if event == "UNIT_POWER_FREQUENT" and powerToken ~= ns.activePowerToken then
+        return
     end
-    if event == "PLAYER_REGEN_DISABLED" and ns.configPanel and ns.configPanel.CancelFramePicker() then
-        print("Combo Points: frame picking cancelled, entering combat.")
+
+    -- Sizes are snapped to whole pixels, which depends on UI scale and resolution.
+    if event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
+        ns.ApplyLayout()
+    end
+
+    if event == "PLAYER_REGEN_DISABLED" then
+        ns.inCombat = true
+        if ns.configPanel and ns.configPanel.CancelFramePicker() then
+            print("Combo Points: frame picking cancelled, entering combat.")
+        end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        ns.inCombat = false
+    elseif event == "PLAYER_ENTERING_WORLD" and ns.attachmentPending then
+        ns.ApplyLayout()
     end
     ns.UpdateTracker()
 end)
@@ -74,5 +100,8 @@ ns.addon:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 ns.addon:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
 ns.addon:RegisterEvent("PLAYER_REGEN_DISABLED")
 ns.addon:RegisterEvent("PLAYER_REGEN_ENABLED")
-ns.addon:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
 ns.addon:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
+ns.addon:RegisterUnitEvent("UNIT_MAXPOWER", "player")
+ns.addon:RegisterEvent("PLAYER_TALENT_UPDATE")
+ns.addon:RegisterEvent("UI_SCALE_CHANGED")
+ns.addon:RegisterEvent("DISPLAY_SIZE_CHANGED")
