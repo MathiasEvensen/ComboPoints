@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1
+
+- Fix the preview showing no counter numbers after logging in, until a setting was changed.
+- Fix the counter font dropdown showing the font's file name instead of its name after logging in, until the font was picked again.
+
 ## 2.0.0
 
 - Add a **Strata** control to the Layout tab: `-` and `+` move the tracker down or up through the UI layers (Background, Low, Medium, High, Dialog) when it ends up behind or in front of other frames. Default is Medium, as before.

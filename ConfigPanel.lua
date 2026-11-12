@@ -438,6 +438,8 @@ local function BuildStyleTab(configPanel, stylePage)
         ns.UpdateTracker()
     end)
     RefreshCounterControls()
+    -- At login the chosen font may not be loaded or registered yet, which leaves its file name in the dropdown.
+    configPanel:HookScript("OnShow", RefreshCounterControls)
 
     Widgets.AddSlider(stylePage, "Counter font size", "counterFontSize", -308, 1)
     Widgets.AddSlider(stylePage, "Counter X offset", "counterOffsetX", -370, 1, "left")
@@ -735,6 +737,10 @@ local function BuildPreviewSection(configPanel)
 
     local previewScaled = false
     local function UpdateConfigPreview()
+        -- Text styled at login, before the client has loaded its font, stays blank: draw only while the window is open.
+        if not configPanel:IsShown() then
+            return
+        end
         local db = ns.db
         local pointCount = PreviewPointCount()
         local maxWidth, totalWidth = PreviewWidths(db)
@@ -796,7 +802,7 @@ local function BuildPreviewSection(configPanel)
             UpdateConfigPreview()
         end
     end)
-    UpdateConfigPreview()
+    configPanel:HookScript("OnShow", UpdateConfigPreview)
 end
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 520, 670
@@ -824,6 +830,7 @@ end
 function ns.CreateConfigPanel()
     local configPanel = CreateFrame("Frame", ADDON_NAME .. "Config", UIParent, "BackdropTemplate")
     ns.configPanel = configPanel
+    configPanel:Hide()
     configPanel.widthReflows = {}
     configPanel:SetResizeBounds(MIN_WIDTH, MIN_HEIGHT, MAX_WIDTH, MAX_HEIGHT)
     configPanel:SetResizable(true)
@@ -933,5 +940,4 @@ function ns.CreateConfigPanel()
     end
     configPanel:SetScript("OnSizeChanged", ReflowWidth)
     ReflowWidth()
-    configPanel:Hide()
 end
